@@ -39,6 +39,7 @@ public sealed partial class ChatService : ObservableObject
     private DeliveryQueue? _queue;
     private int _totalUnread;
     private int _maintenanceTicks;
+    private bool _loading;
 
     public ChatService(Dispatcher ui)
     {
@@ -97,12 +98,21 @@ public sealed partial class ChatService : ObservableObject
             }
         }
 
+        _loading = true;
         foreach (var conversation in _storage.Load<List<Conversation>>(ConversationsFile) ?? [])
         {
             if (!_conversationsById.ContainsKey(conversation.Id))
             {
                 Register(conversation);
             }
+        }
+
+        _loading = false;
+
+        // Everyone known gets a chat entry, even if nobody has written yet.
+        foreach (var contact in Contacts.ToList())
+        {
+            EnsureDirect(contact.Ip);
         }
 
         RecomputeUnread();
@@ -136,7 +146,7 @@ public sealed partial class ChatService : ObservableObject
         }
 
         _maintenanceTimer.Start();
-        _presence.Announce(PresenceKinds.Hello);
+        _presence.Announce(PresenceKinds.Hello, sweepSubnet: true);
     }
 
     public void Shutdown()
@@ -196,6 +206,11 @@ public sealed partial class ChatService : ObservableObject
 
         contact = new Contact { Ip = ip };
         AddContact(contact);
+        if (!_loading)
+        {
+            EnsureDirect(ip);
+        }
+
         ScheduleSave();
         return contact;
     }
@@ -213,21 +228,34 @@ public sealed partial class ChatService : ObservableObject
         return contact;
     }
 
+    /// <summary>Me, or (in normal mode) any loopback address: a real peer on the LAN never has one.</summary>
     public bool IsSelf(string ip) =>
-        ip == Me.Ip || (BindAddress is null && _localIps.Contains(ip));
+        ip == Me.Ip || (BindAddress is null && (_localIps.Contains(ip) || IPAddress.IsLoopback(IPAddress.Parse(ip))));
 
-    public Conversation GetOrCreateDirect(string ip)
+    public Conversation GetOrCreateDirect(string ip) =>
+        _conversationsById.TryGetValue(DirectPrefix + ip, out var existing)
+            ? existing
+            : CreateDirect(ip, DateTime.UtcNow);
+
+    /// <summary>
+    /// Discovered people get an empty 1:1 entry so they show up in the chat list automatically.
+    /// No activity time, so they sort below real chats.
+    /// </summary>
+    private void EnsureDirect(string ip)
     {
-        if (_conversationsById.TryGetValue(DirectPrefix + ip, out var existing))
+        if (!_conversationsById.ContainsKey(DirectPrefix + ip))
         {
-            return existing;
+            CreateDirect(ip, default);
         }
+    }
 
+    private Conversation CreateDirect(string ip, DateTime lastActivityUtc)
+    {
         var conversation = new Conversation
         {
             Id = DirectPrefix + ip,
             MemberIps = [ip],
-            LastActivityUtc = DateTime.UtcNow,
+            LastActivityUtc = lastActivityUtc,
         };
         Register(conversation);
         ScheduleSave();

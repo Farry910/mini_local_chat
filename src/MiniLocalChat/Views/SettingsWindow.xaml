@@ -28,6 +28,27 @@
             <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
                        Text="You can also drag the LED up or down, or over to the other side." />
 
+            <TextBlock Style="{StaticResource FieldLabel}" Text="New message alert" />
+            <CheckBox x:Name="RippleBox" VerticalContentAlignment="Center" FontSize="13"
+                      Content="Ripple across the screen when a message arrives" />
+            <StackPanel Margin="22,8,0,0" Orientation="Horizontal"
+                        IsEnabled="{Binding IsChecked, ElementName=RippleBox}">
+                <TextBlock VerticalAlignment="Center" FontSize="13" Text="Repeat every" />
+                <TextBox x:Name="RippleIntervalBox" Width="56" Margin="8,0" Style="{StaticResource FieldTextBox}"
+                         HorizontalContentAlignment="Right" MaxLength="4" />
+                <TextBlock VerticalAlignment="Center" FontSize="13" Text="seconds until it's read" />
+            </StackPanel>
+            <TextBlock x:Name="RippleError" Margin="22,4,0,0" FontSize="12" Foreground="#C4314B" Visibility="Collapsed" />
+
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Can't see other people?" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Margin="12,0,0,0" VerticalAlignment="Top" Style="{StaticResource SecondaryButton}"
+                        Content="Allow through firewall" Click="OnAllowFirewall" />
+                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
+                           Text="Windows Firewall may be blocking the app. Do this once on each computer (asks for admin rights)." />
+            </DockPanel>
+            <TextBlock x:Name="FirewallResult" Margin="0,4,0,0" FontSize="12" Visibility="Collapsed" />
+
             <CheckBox x:Name="AutoStartBox" Margin="0,16,0,0" VerticalContentAlignment="Center" FontSize="13"
                       Content="Start Mini Local Chat when I sign in to Windows" />
 

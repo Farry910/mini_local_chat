@@ -9,12 +9,12 @@ using MiniLocalChat.Models;
 namespace MiniLocalChat.Views;
 
 /// <summary>
-/// Hover panel next to the LED: lists only the chats with unread messages (1:1 and group);
-/// pick one to read and reply without opening the full app.
+/// Hover panel next to the LED: every chat and person (offline ones too, messages to them are queued),
+/// with new messages on top. Pick one to read and reply without opening the full app.
 /// </summary>
 public partial class MiniChatWindow : Window
 {
-    private readonly ListCollectionView _unread;
+    private readonly ListCollectionView _chats;
     private Conversation? _open;
 
     public MiniChatWindow()
@@ -22,18 +22,15 @@ public partial class MiniChatWindow : Window
         InitializeComponent();
         SourceInitialized += (_, _) => Win32.MakeToolWindow(this);
 
-        _unread = new ListCollectionView(App.Chat.Conversations)
-        {
-            // The open chat stays listed after it's read, until the user goes back.
-            Filter = o => o is Conversation c && (c.UnreadCount > 0 || ReferenceEquals(c, _open)),
-            IsLiveFiltering = true,
-            IsLiveSorting = true,
-        };
-        _unread.LiveFilteringProperties.Add(nameof(Conversation.UnreadCount));
-        _unread.LiveSortingProperties.Add(nameof(Conversation.LastActivityUtc));
-        _unread.SortDescriptions.Add(new SortDescription(nameof(Conversation.LastActivityUtc), ListSortDirection.Descending));
-        ((INotifyCollectionChanged)_unread).CollectionChanged += (_, _) => UpdateEmptyState();
-        UnreadList.ItemsSource = _unread;
+        _chats = new ListCollectionView(App.Chat.Conversations) { IsLiveSorting = true };
+        _chats.SortDescriptions.Add(new SortDescription(nameof(Conversation.HasUnread), ListSortDirection.Descending));
+        _chats.SortDescriptions.Add(new SortDescription(nameof(Conversation.LastActivityUtc), ListSortDirection.Descending));
+        _chats.SortDescriptions.Add(new SortDescription(nameof(Conversation.Title), ListSortDirection.Ascending));
+        _chats.LiveSortingProperties.Add(nameof(Conversation.HasUnread));
+        _chats.LiveSortingProperties.Add(nameof(Conversation.LastActivityUtc));
+        _chats.LiveSortingProperties.Add(nameof(Conversation.Title));
+        ((INotifyCollectionChanged)_chats).CollectionChanged += (_, _) => UpdateEmptyState();
+        ChatList.ItemsSource = _chats;
         UpdateEmptyState();
     }
 
@@ -46,11 +43,17 @@ public partial class MiniChatWindow : Window
         _open = null;
         ChatPane.Conversation = null;
         ChatPane.Visibility = Visibility.Collapsed;
-        UnreadList.Visibility = Visibility.Visible;
+        ChatList.Visibility = Visibility.Visible;
         BackButton.Visibility = Visibility.Collapsed;
         BindingOperations.ClearBinding(HeaderTitle, TextBlock.TextProperty);
-        HeaderTitle.Text = "New messages";
-        _unread.Refresh();
+        BindingOperations.ClearBinding(HeaderStatus, TextBlock.TextProperty);
+        HeaderTitle.Text = "Chats";
+        HeaderStatus.Visibility = Visibility.Collapsed;
+        if (_chats.Cast<object>().FirstOrDefault() is { } first)
+        {
+            ChatList.ScrollIntoView(first);
+        }
+
         UpdateEmptyState();
     }
 
@@ -58,14 +61,17 @@ public partial class MiniChatWindow : Window
     {
         _open = conversation;
         App.Chat.MarkRead(conversation);
-        _unread.Refresh();
 
         ChatPane.Conversation = conversation;
         ChatPane.Visibility = Visibility.Visible;
-        UnreadList.Visibility = Visibility.Collapsed;
+        ChatList.Visibility = Visibility.Collapsed;
         EmptyState.Visibility = Visibility.Collapsed;
         BackButton.Visibility = Visibility.Visible;
         HeaderTitle.SetBinding(TextBlock.TextProperty, new Binding(nameof(Conversation.Title)) { Source = conversation });
+        HeaderStatus.SetBinding(TextBlock.TextProperty, conversation.IsGroup
+            ? new Binding(nameof(Conversation.Subtitle)) { Source = conversation }
+            : new Binding("Peer.IsOnline") { Source = conversation, Converter = (IValueConverter)FindResource("PresenceText") });
+        HeaderStatus.Visibility = Visibility.Visible;
         if (IsActive)
         {
             ChatPane.FocusInput();
@@ -73,13 +79,13 @@ public partial class MiniChatWindow : Window
     }
 
     private void UpdateEmptyState() =>
-        EmptyState.Visibility = _open is null && _unread.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = _open is null && _chats.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
 
-    private void OnUnreadSelected(object sender, SelectionChangedEventArgs e)
+    private void OnChatSelected(object sender, SelectionChangedEventArgs e)
     {
-        if (UnreadList.SelectedItem is Conversation conversation)
+        if (ChatList.SelectedItem is Conversation conversation)
         {
-            UnreadList.SelectedItem = null;
+            ChatList.SelectedItem = null;
             Activate();
             OpenConversation(conversation);
         }

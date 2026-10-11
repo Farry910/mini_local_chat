@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -6,7 +7,7 @@ namespace MiniLocalChat.Network;
 
 public static class NetUtil
 {
-    private static readonly string[] VirtualAdapterHints = ["virtual", "vethernet", "vmware", "virtualbox", "hyper-v", "wsl", "docker", "vpn"];
+    private static readonly string[] VirtualAdapterHints = ["virtual", "vethernet", "vmware", "virtualbox", "hyper-v", "wsl", "docker", "vpn", "tailscale", "zerotier", "wireguard"];
 
     public static string? Normalize(string? ip) =>
         IPAddress.TryParse(ip, out var address) && address.AddressFamily == AddressFamily.InterNetwork
@@ -44,6 +45,57 @@ public static class NetUtil
         return result;
     }
 
+    /// <summary>
+    /// Every host address on the local subnets, for direct "hello"s when broadcasts don't get through
+    /// (common on Wi-Fi). Big subnets are narrowed to the /24 around our own address.
+    /// </summary>
+    public static List<IPAddress> GetSubnetHosts()
+    {
+        const long maxHostsPerSubnet = 1022;
+        var hosts = new HashSet<IPAddress>();
+        foreach (var unicast in GetUpInterfaces().Where(n => !IsVirtual(n)).SelectMany(n => n.GetIPProperties().UnicastAddresses))
+        {
+            if (unicast.Address.AddressFamily != AddressFamily.InterNetwork || unicast.IPv4Mask is null || IsLinkLocal(unicast.Address))
+            {
+                continue;
+            }
+
+            var ip = ToUInt(unicast.Address);
+            var mask = ToUInt(unicast.IPv4Mask);
+            var hostCount = (long)~mask - 1;
+            if (hostCount < 1)
+            {
+                continue; // /31 or /32, e.g. a VPN tunnel address
+            }
+
+            if (hostCount > maxHostsPerSubnet)
+            {
+                mask = 0xFFFFFF00;
+            }
+
+            var network = ip & mask;
+            var broadcast = network | ~mask;
+            for (var host = network + 1; host < broadcast; host++)
+            {
+                if (host != ip)
+                {
+                    hosts.Add(FromUInt(host));
+                }
+            }
+        }
+
+        return [.. hosts];
+    }
+
+    private static uint ToUInt(IPAddress address) => BinaryPrimitives.ReadUInt32BigEndian(address.GetAddressBytes());
+
+    private static IPAddress FromUInt(uint value)
+    {
+        var bytes = new byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(bytes, value);
+        return new IPAddress(bytes);
+    }
+
     private static IEnumerable<NetworkInterface> GetUpInterfaces()
     {
         try
@@ -65,8 +117,7 @@ public static class NetUtil
             var props = nic.GetIPProperties();
             var hasGateway = props.GatewayAddresses.Any(g =>
                 g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any));
-            var text = (nic.Name + " " + nic.Description).ToLowerInvariant();
-            var isVirtual = VirtualAdapterHints.Any(text.Contains);
+            var isVirtual = IsVirtual(nic);
 
             foreach (var unicast in props.UnicastAddresses)
             {
@@ -80,6 +131,13 @@ public static class NetUtil
                 yield return (address, score);
             }
         }
+    }
+
+    /// <summary>VM, container and VPN adapters: never the LAN the chat runs on.</summary>
+    private static bool IsVirtual(NetworkInterface nic)
+    {
+        var text = (nic.Name + " " + nic.Description).ToLowerInvariant();
+        return VirtualAdapterHints.Any(text.Contains);
     }
 
     private static bool IsLinkLocal(IPAddress a) => a.GetAddressBytes() is [169, 254, ..];

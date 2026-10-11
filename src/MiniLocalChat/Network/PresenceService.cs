@@ -5,13 +5,15 @@ using System.Text.Json;
 namespace MiniLocalChat.Network;
 
 /// <summary>
-/// UDP heartbeat: who is online and what their nickname is. Sent as LAN broadcast and also
-/// directly to every known contact, in case the network drops broadcasts.
+/// UDP heartbeat: who is online and what their nickname is. Sent as LAN broadcast and directly to
+/// every known contact. In case the network drops broadcasts, a "hello" also goes to every address
+/// on the local subnet at startup and once a minute; whoever runs the app answers.
 /// </summary>
 public sealed class PresenceService : IDisposable
 {
     private const int SioUdpConnReset = unchecked((int)0x9800000C);
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);
+    private const int SweepEveryTicks = 12;
 
     private readonly IPAddress? _bind;
     private readonly int _port;
@@ -21,6 +23,7 @@ public sealed class PresenceService : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private UdpClient? _udp;
     private Timer? _timer;
+    private int _ticks;
 
     public PresenceService(IPAddress? bind, int port, Func<string> nickname, Func<IReadOnlyCollection<string>> knownIps, Action<string, PresencePacket> onPacket)
     {
@@ -40,15 +43,24 @@ public sealed class PresenceService : IDisposable
         _udp = udp;
 
         _ = ReceiveLoopAsync();
-        _timer = new Timer(_ => Announce(PresenceKinds.Here), null, Interval, Interval);
+        _timer = new Timer(_ => OnTick(), null, Interval, Interval);
     }
 
-    public void Announce(string kind)
+    public void Announce(string kind, bool sweepSubnet = false)
     {
         var bytes = Serialize(kind);
         foreach (var target in Targets())
         {
             SendRaw(bytes, target);
+        }
+
+        if (sweepSubnet && !IsLoopbackOnly)
+        {
+            var hello = Serialize(PresenceKinds.Hello);
+            foreach (var host in NetUtil.GetSubnetHosts())
+            {
+                SendRaw(hello, host);
+            }
         }
     }
 
@@ -68,13 +80,21 @@ public sealed class PresenceService : IDisposable
         _cts.Dispose();
     }
 
+    private bool IsLoopbackOnly => _bind is not null && IPAddress.IsLoopback(_bind);
+
+    private void OnTick()
+    {
+        _ticks++;
+        Announce(PresenceKinds.Here, sweepSubnet: _ticks % SweepEveryTicks == 0);
+    }
+
     private byte[] Serialize(string kind) =>
         JsonSerializer.SerializeToUtf8Bytes(new PresencePacket { Kind = kind, Nick = _nickname() }, Wire.Json);
 
     private HashSet<IPAddress> Targets()
     {
         var targets = new HashSet<IPAddress>();
-        if (_bind is null || !IPAddress.IsLoopback(_bind))
+        if (!IsLoopbackOnly)
         {
             targets.Add(IPAddress.Broadcast);
             targets.UnionWith(NetUtil.GetBroadcastAddresses());

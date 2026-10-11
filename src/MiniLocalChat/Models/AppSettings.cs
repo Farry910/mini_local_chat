@@ -22,5 +22,10 @@ public sealed class AppSettings
 
     public bool StartWithWindows { get; set; }
 
+    /// <summary>Ripple across the whole screen when a message arrives, repeated while it's unread.</summary>
+    public bool RippleEnabled { get; set; } = true;
+
+    public int RippleIntervalSeconds { get; set; } = 30;
+
     public bool TrayHintShown { get; set; }
 }

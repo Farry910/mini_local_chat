@@ -8,6 +8,8 @@ internal static class Win32
 {
     private const int GwlExStyle = -20;
     private const int WsExToolWindow = 0x80;
+    private const int WsExTransparent = 0x20;
+    private const int WsExNoActivate = 0x08000000;
     private const uint SwpNoSize = 0x1;
     private const uint SwpNoMove = 0x2;
     private const uint SwpNoActivate = 0x10;
@@ -75,6 +77,13 @@ internal static class Win32
     {
         var hwnd = new WindowInteropHelper(window).Handle;
         SetWindowLong(hwnd, GwlExStyle, GetWindowLong(hwnd, GwlExStyle) | WsExToolWindow);
+    }
+
+    /// <summary>Overlay mode: mouse clicks go to whatever is underneath, never takes focus, not in Alt+Tab.</summary>
+    public static void MakeClickThrough(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        SetWindowLong(hwnd, GwlExStyle, GetWindowLong(hwnd, GwlExStyle) | WsExTransparent | WsExToolWindow | WsExNoActivate);
     }
 }
 

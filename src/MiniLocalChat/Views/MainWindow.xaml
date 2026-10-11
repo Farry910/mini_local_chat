@@ -78,7 +78,7 @@
 
                 <TextBlock Grid.Row="2" Margin="24,30" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                            FontSize="13" Foreground="{StaticResource SubtleTextBrush}"
-                           Text="No chats yet. People on the network appear automatically — click ✎ to start a chat."
+                           Text="Looking for people… Everyone running Mini Local Chat on your network appears here automatically."
                            Visibility="{Binding Conversations.Count, Converter={StaticResource ZeroToVisibility}}" />
             </Grid>
         </Border>

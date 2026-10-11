@@ -146,11 +146,24 @@ public partial class ChatView : UserControl
         }
     }
 
-    private void ScrollToEndSoon()
+    // The virtualized list only estimates its height until the items near the end are measured,
+    // so one ScrollToEnd can stop short. Repeat after each layout pass until we're really at the bottom.
+    private void ScrollToEndSoon(int attemptsLeft = 10)
     {
-        // Twice: once after layout, once more after images and virtualized items have measured.
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => Scroller?.ScrollToEnd());
-        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => Scroller?.ScrollToEnd());
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            if (Scroller is not { } scroller)
+            {
+                return;
+            }
+
+            scroller.ScrollToEnd();
+            scroller.UpdateLayout();
+            if (attemptsLeft > 0 && scroller.VerticalOffset < scroller.ScrollableHeight - 1)
+            {
+                ScrollToEndSoon(attemptsLeft - 1);
+            }
+        });
     }
 
     // ---- Sending --------------------------------------------------------------------------------

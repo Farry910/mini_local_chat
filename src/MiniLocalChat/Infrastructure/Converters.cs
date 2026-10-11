@@ -56,6 +56,16 @@ public sealed class EmptyToVisibilityConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>Presence line under a person's name; makes clear that offline people can still be messaged.</summary>
+public sealed class PresenceTextConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is true ? "Online" : "Offline · messages are delivered when they come online";
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Timestamp shown above a message bubble.</summary>
 public sealed class MessageTimeConverter : IValueConverter
 {

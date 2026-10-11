@@ -160,8 +160,15 @@
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
                                    Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
-                                   Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" />
+                        <!-- 1:1: presence + IP. Group: member list. -->
+                        <TextBlock FontSize="12" Foreground="{StaticResource SubtleTextBrush}" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding IsGroup, Converter={StaticResource InverseBoolToVisibility}}">
+                            <Run Text="{Binding Peer.IsOnline, Mode=OneWay, Converter={StaticResource PresenceText}, FallbackValue=''}" />
+                            <Run Text="·" />
+                            <Run Text="{Binding Subtitle, Mode=OneWay}" />
+                        </TextBlock>
+                        <TextBlock FontSize="12" Foreground="{StaticResource SubtleTextBrush}" TextTrimming="CharacterEllipsis"
+                                   Text="{Binding Subtitle}" Visibility="{Binding IsGroup, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </DockPanel>
             </Border>

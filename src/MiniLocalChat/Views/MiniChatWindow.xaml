@@ -24,32 +24,38 @@
                 <Border CornerRadius="7,7,0,0" Background="{StaticResource AccentBrush}">
                     <DockPanel Margin="6,0">
                         <Button x:Name="BackButton" Style="{StaticResource HeaderIconButton}" Content="&#xE72B;"
-                                ToolTip="Back to new messages" Visibility="Collapsed" Click="OnBack" />
+                                ToolTip="Back to all chats" Visibility="Collapsed" Click="OnBack" />
                         <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE8A7;"
                                 ToolTip="Open the full app" Click="OnOpenApp" />
                         <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE70F;"
                                 ToolTip="New message" Click="OnNewMessage" />
-                        <TextBlock x:Name="HeaderTitle" Margin="8,0" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold"
-                                   Foreground="White" TextTrimming="CharacterEllipsis" Text="New messages" />
+                        <StackPanel Margin="8,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="HeaderTitle" FontSize="15" FontWeight="SemiBold" Foreground="White"
+                                       TextTrimming="CharacterEllipsis" Text="Chats" />
+                            <!-- In a chat: online/offline (1:1) or the members (group). -->
+                            <TextBlock x:Name="HeaderStatus" FontSize="11" Foreground="#E0FFFFFF" TextTrimming="CharacterEllipsis"
+                                       Visibility="Collapsed" />
+                        </StackPanel>
                     </DockPanel>
                 </Border>
 
                 <Grid Grid.Row="1">
                     <!-- Not synced with the view's current item, or the first chat would open by itself. -->
-                    <ListBox x:Name="UnreadList" Padding="0,6" Background="Transparent" BorderThickness="0"
+                    <ListBox x:Name="ChatList" Padding="0,6" Background="Transparent" BorderThickness="0"
                              IsSynchronizedWithCurrentItem="False"
                              ItemTemplate="{StaticResource ConversationItemTemplate}"
                              ItemContainerStyle="{StaticResource ConversationItemStyle}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             SelectionChanged="OnUnreadSelected" />
+                             SelectionChanged="OnChatSelected" />
 
                     <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
                         <TextBlock HorizontalAlignment="Center" FontSize="40" FontFamily="{StaticResource IconFont}"
-                                   Foreground="#B4B6E6" Text="&#xE73E;" />
+                                   Foreground="#B4B6E6" Text="&#xE716;" />
                         <TextBlock Margin="0,10,0,2" HorizontalAlignment="Center" FontSize="15" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextBrush}" Text="You're all caught up" />
-                        <TextBlock HorizontalAlignment="Center" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
-                                   Text="Use ✎ above to send a new message." />
+                                   Foreground="{StaticResource TextBrush}" Text="Looking for people…" />
+                        <TextBlock Margin="20,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="12"
+                                   Foreground="{StaticResource SubtleTextBrush}"
+                                   Text="Everyone running Mini Local Chat on your network appears here automatically." />
                     </StackPanel>
 
                     <c:ChatView x:Name="ChatPane" IsCompact="True" Visibility="Collapsed" />

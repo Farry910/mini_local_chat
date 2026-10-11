@@ -36,8 +36,18 @@ public sealed class Conversation : ObservableObject
     public int UnreadCount
     {
         get => _unreadCount;
-        set => Set(ref _unreadCount, value);
+        set
+        {
+            if (Set(ref _unreadCount, value))
+            {
+                OnPropertyChanged(nameof(HasUnread));
+            }
+        }
     }
+
+    /// <summary>Sort key: chats with new messages go to the top of the floating panel.</summary>
+    [JsonIgnore]
+    public bool HasUnread => UnreadCount > 0;
 
     public DateTime LastActivityUtc
     {

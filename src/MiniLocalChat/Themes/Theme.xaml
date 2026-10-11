@@ -28,6 +28,7 @@
     <i:PositiveConverter x:Key="IsPositive" />
     <i:EmptyToVisibilityConverter x:Key="EmptyToVisible" />
     <i:EmptyToVisibilityConverter x:Key="EmptyToCollapsed" Invert="True" />
+    <i:PresenceTextConverter x:Key="PresenceText" />
     <i:MessageTimeConverter x:Key="MessageTime" />
     <i:ListTimeConverter x:Key="ListTime" />
     <i:FileSizeConverter x:Key="FileSize" />

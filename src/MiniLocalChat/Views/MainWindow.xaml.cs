@@ -27,8 +27,11 @@ public partial class MainWindow : Window
             Filter = MatchesSearch,
             IsLiveSorting = true,
         };
+        // Recent chats first; people you haven't talked to yet follow alphabetically.
         _conversations.SortDescriptions.Add(new SortDescription(nameof(Conversation.LastActivityUtc), ListSortDirection.Descending));
+        _conversations.SortDescriptions.Add(new SortDescription(nameof(Conversation.Title), ListSortDirection.Ascending));
         _conversations.LiveSortingProperties.Add(nameof(Conversation.LastActivityUtc));
+        _conversations.LiveSortingProperties.Add(nameof(Conversation.Title));
         ConversationList.ItemsSource = _conversations;
 
         Activated += (_, _) => MarkSelectedRead();

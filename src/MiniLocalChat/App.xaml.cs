@@ -21,6 +21,7 @@ public partial class App : Application
 {
     private MainWindow? _main;
     private FloatingController? _floating;
+    private RippleController? _ripples;
     private TrayIcon? _tray;
     private Mutex? _instanceMutex;
     private EventWaitHandle? _showSignal;
@@ -73,6 +74,9 @@ public partial class App : Application
         _tray.SetUnread(Chat.TotalUnread);
 
         Chat.IsConversationVisible = c => _main.IsShowing(c) || _floating.IsShowing(c);
+        _ripples = new RippleController(Chat, () =>
+            _floating.LedCenter ?? new Point(SystemParameters.WorkArea.Left + SystemParameters.WorkArea.Width / 2,
+                                             SystemParameters.WorkArea.Top + SystemParameters.WorkArea.Height / 2));
         Chat.PropertyChanged += OnChatPropertyChanged;
         Chat.MessageReceived += (_, _) =>
         {
@@ -146,6 +150,7 @@ public partial class App : Application
         if (SettingsWindow.ShowFor(owner))
         {
             _floating?.ApplySettings();
+            _ripples?.ApplySettings();
         }
     }
 

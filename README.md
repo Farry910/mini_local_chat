@@ -10,6 +10,7 @@ A Teams-style private chat for computers on the same local network (e.g. a `192.
   - glowing green with a number: unread messages
   - hover it: a mini panel lists only the chats with new messages, so you can read and reply without opening the app
   - drag it up/down or to the other side; double-click it to open the full app
+- **Screen ripple.** When a message arrives, green rings spread across the whole screen from the LED, and again every 30 s (configurable in Settings, or off) until it's read. The overlay never blocks clicks or takes focus.
 - **Exit** only from the tray icon menu (or the LED's right-click menu).
 
 ## Build & run
@@ -21,13 +22,15 @@ dotnet build MiniLocalChat.slnx -c Release
 .\src\MiniLocalChat\bin\Release\net10.0-windows\MiniLocalChat.exe
 ```
 
-On first start Windows Firewall asks whether to allow the app on the network. Allow it on **private networks**, or the other computers can't reach it.
+On first start Windows Firewall asks whether to allow the app on the network. Allow it, or the other computers can't see or reach it. If the prompt was dismissed, use **Settings → Allow through firewall** (asks for admin rights) on that computer.
 
-To hand it to other PCs without installing .NET, publish a self-contained build:
+To hand it to other PCs without installing .NET, publish one self-contained, compressed `.exe` (about 70 MB):
 
 ```powershell
-dotnet publish src/MiniLocalChat -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+dotnet publish src/MiniLocalChat/MiniLocalChat.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o publish
 ```
+
+`publish\MiniLocalChat.exe` is the only file to copy.
 
 ### Command-line options
 
@@ -42,7 +45,9 @@ dotnet publish src/MiniLocalChat -c Release -r win-x64 --self-contained -p:Publi
 | Port | Protocol | Use |
 | --- | --- | --- |
 | 50505 | TCP | Messages and files. One connection per message: `"MLC1"`, int32 header length, JSON header, then file bytes. The receiver replies with one ACK byte once it has stored the message; no ACK means the sender retries later. |
-| 50506 | UDP | Presence heartbeat every 5 s (LAN broadcast + directly to known contacts) carrying the nickname. Someone is shown offline after ~17 s of silence. |
+| 50506 | UDP | Presence heartbeat every 5 s (LAN broadcast + directly to known contacts) carrying the nickname. At startup and once a minute a "hello" also goes to every address on the local subnet, for networks that drop broadcasts. Someone is shown offline after ~17 s of silence. |
+
+Everyone found this way appears in the chat list automatically; nobody needs to be added by hand.
 
 - The sender of a message is always taken from the TCP connection's remote IP, never from the message itself.
 - Group chats have an id shared by all members; every group message carries the member list, so a recipient's app creates the same group automatically.

@@ -62,6 +62,9 @@ public sealed class FloatingController
 
     public bool IsShowing(Conversation conversation) => _mini.IsShowing(conversation);
 
+    /// <summary>Center of the LED in screen DIPs, while floating mode is on.</summary>
+    public Point? LedCenter => IsActive ? new Point(_led.Left + _led.Width / 2, _led.Top + _led.Height / 2) : null;
+
     public void Enter()
     {
         IsActive = true;

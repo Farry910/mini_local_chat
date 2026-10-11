@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using MiniLocalChat.Infrastructure;
 using MiniLocalChat.Network;
 using MiniLocalChat.Services;
@@ -39,6 +40,8 @@ public partial class SettingsWindow : Window
         LedLeft.IsChecked = _chat.Settings.LedSide == nameof(LedSide.Left);
         LedRight.IsChecked = !LedLeft.IsChecked;
         AutoStartBox.IsChecked = _chat.Settings.StartWithWindows;
+        RippleBox.IsChecked = _chat.Settings.RippleEnabled;
+        RippleIntervalBox.Text = _chat.Settings.RippleIntervalSeconds.ToString();
 
         if (welcome)
         {
@@ -85,6 +88,17 @@ public partial class SettingsWindow : Window
 
         if (!_welcome)
         {
+            if (!int.TryParse(RippleIntervalBox.Text.Trim(), out var interval)
+                || interval is < RippleController.MinIntervalSeconds or > RippleController.MaxIntervalSeconds)
+            {
+                RippleError.Text = $"Enter a number of seconds from {RippleController.MinIntervalSeconds} to {RippleController.MaxIntervalSeconds}.";
+                RippleError.Visibility = Visibility.Visible;
+                RippleIntervalBox.Focus();
+                return;
+            }
+
+            _chat.Settings.RippleEnabled = RippleBox.IsChecked == true;
+            _chat.Settings.RippleIntervalSeconds = interval;
             _chat.Settings.LedSide = LedLeft.IsChecked == true ? nameof(LedSide.Left) : nameof(LedSide.Right);
             var autoStart = AutoStartBox.IsChecked == true;
             if (autoStart != _chat.Settings.StartWithWindows)
@@ -96,6 +110,16 @@ public partial class SettingsWindow : Window
 
         _chat.ApplyProfile(nickname, (IpCombo.SelectedItem as ComboBoxItem)?.Tag as string);
         DialogResult = true;
+    }
+
+    private void OnAllowFirewall(object sender, RoutedEventArgs e)
+    {
+        var ok = FirewallSetup.AllowThisApp();
+        FirewallResult.Text = ok
+            ? "✓ Allowed. Other computers can now reach this one."
+            : "Not changed – the admin prompt was declined or Windows refused.";
+        FirewallResult.Foreground = ok ? (Brush)FindResource("AccentBrush") : Brushes.Firebrick;
+        FirewallResult.Visibility = Visibility.Visible;
     }
 
     private void OnOpenDataFolder(object sender, RoutedEventArgs e) =>
