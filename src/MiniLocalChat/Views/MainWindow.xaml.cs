@@ -22,16 +22,7 @@ public partial class MainWindow : Window
         Title = AppInfo.Title;
         DataContext = _chat;
 
-        _conversations = new ListCollectionView(_chat.Conversations)
-        {
-            Filter = MatchesSearch,
-            IsLiveSorting = true,
-        };
-        // Recent chats first; people you haven't talked to yet follow alphabetically.
-        _conversations.SortDescriptions.Add(new SortDescription(nameof(Conversation.LastActivityUtc), ListSortDirection.Descending));
-        _conversations.SortDescriptions.Add(new SortDescription(nameof(Conversation.Title), ListSortDirection.Ascending));
-        _conversations.LiveSortingProperties.Add(nameof(Conversation.LastActivityUtc));
-        _conversations.LiveSortingProperties.Add(nameof(Conversation.Title));
+        _conversations = ChatListView.Create(_chat.Conversations, () => SearchBox.Text);
         ConversationList.ItemsSource = _conversations;
 
         Activated += (_, _) => MarkSelectedRead();
@@ -66,10 +57,6 @@ public partial class MainWindow : Window
 
         base.OnClosing(e);
     }
-
-    private bool MatchesSearch(object item) =>
-        SearchBox.Text.Length == 0
-        || (item is Conversation c && c.Title.Contains(SearchBox.Text, StringComparison.CurrentCultureIgnoreCase));
 
     private void MarkSelectedRead()
     {

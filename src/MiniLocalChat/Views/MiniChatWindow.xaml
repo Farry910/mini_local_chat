@@ -27,8 +27,11 @@
                                 ToolTip="Back to all chats" Visibility="Collapsed" Click="OnBack" />
                         <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE8A7;"
                                 ToolTip="Open the full app" Click="OnOpenApp" />
-                        <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE70F;"
+                        <Button x:Name="NewMessageButton" DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE70F;"
                                 ToolTip="New message" Click="OnNewMessage" />
+                        <Button x:Name="FindButton" DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE721;"
+                                ToolTip="Search in this chat (Ctrl+F)" Visibility="Collapsed" Click="OnFindInChat" />
+                        <c:RippleBlockButton x:Name="RippleBlock" DockPanel.Dock="Right" OnAccent="True" Visibility="Collapsed" />
                         <StackPanel Margin="8,0" VerticalAlignment="Center">
                             <TextBlock x:Name="HeaderTitle" FontSize="15" FontWeight="SemiBold" Foreground="White"
                                        TextTrimming="CharacterEllipsis" Text="Chats" />
@@ -40,13 +43,32 @@
                 </Border>
 
                 <Grid Grid.Row="1">
-                    <!-- Not synced with the view's current item, or the first chat would open by itself. -->
-                    <ListBox x:Name="ChatList" Padding="0,6" Background="Transparent" BorderThickness="0"
-                             IsSynchronizedWithCurrentItem="False"
-                             ItemTemplate="{StaticResource ConversationItemTemplate}"
-                             ItemContainerStyle="{StaticResource ConversationItemStyle}"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             SelectionChanged="OnChatSelected" />
+                    <DockPanel x:Name="ListPanel">
+                        <Border DockPanel.Dock="Top" Height="30" Margin="10,8,10,0" Background="White" CornerRadius="4"
+                                BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+                            <DockPanel Margin="8,0">
+                                <TextBlock VerticalAlignment="Center" FontSize="12" FontFamily="{StaticResource IconFont}"
+                                           Foreground="{StaticResource SubtleTextBrush}" Text="&#xE721;" />
+                                <Grid Margin="6,0,0,0">
+                                    <TextBox x:Name="SearchBox" Style="{StaticResource BareTextBox}" FontSize="13" TextChanged="OnSearchChanged" />
+                                    <TextBlock Margin="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" FontSize="13"
+                                               Foreground="#8A8A8A" Text="Search people and chats"
+                                               Visibility="{Binding Text, ElementName=SearchBox, Converter={StaticResource EmptyToVisible}}" />
+                                </Grid>
+                            </DockPanel>
+                        </Border>
+                        <!-- Not synced with the view's current item, or the first chat would open by itself. -->
+                        <ListBox x:Name="ChatList" Padding="0,0,0,6" Background="Transparent" BorderThickness="0"
+                                 IsSynchronizedWithCurrentItem="False"
+                                 ItemTemplate="{StaticResource ConversationItemTemplate}"
+                                 ItemContainerStyle="{StaticResource ConversationItemStyle}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 SelectionChanged="OnChatSelected">
+                            <ListBox.GroupStyle>
+                                <GroupStyle HidesIfEmpty="True" HeaderTemplate="{StaticResource SectionHeaderTemplate}" />
+                            </ListBox.GroupStyle>
+                        </ListBox>
+                    </DockPanel>
 
                     <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
                         <TextBlock HorizontalAlignment="Center" FontSize="40" FontFamily="{StaticResource IconFont}"

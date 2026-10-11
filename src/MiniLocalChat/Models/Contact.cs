@@ -15,6 +15,7 @@ public sealed class Contact : ObservableObject
     private string? _color1;
     private string? _color2;
     private bool _isOnline;
+    private bool _rippleBlocked;
 
     public string Ip
     {
@@ -70,6 +71,16 @@ public sealed class Contact : ObservableObject
     }
 
     public DateTime LastSeenUtc { get; set; }
+
+    /// <summary>
+    /// My local choice: messages from this person never trigger the screen ripple (e.g. someone spamming).
+    /// Their messages still arrive and light the LED. They aren't told.
+    /// </summary>
+    public bool RippleBlocked
+    {
+        get => _rippleBlocked;
+        set => Set(ref _rippleBlocked, value);
+    }
 
     [JsonIgnore]
     public bool IsOnline

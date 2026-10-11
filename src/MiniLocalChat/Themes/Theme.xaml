@@ -2,7 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:i="clr-namespace:MiniLocalChat.Infrastructure"
                     xmlns:m="clr-namespace:MiniLocalChat.Models"
-                    xmlns:c="clr-namespace:MiniLocalChat.Controls">
+                    xmlns:c="clr-namespace:MiniLocalChat.Controls"
+                    xmlns:v="clr-namespace:MiniLocalChat.Views">
 
     <!-- Teams-like palette -->
     <SolidColorBrush x:Key="AccentBrush" Color="#5B5FC7" />
@@ -23,6 +24,7 @@
     <i:BoolToVisibilityConverter x:Key="BoolToVisibility" />
     <i:BoolToVisibilityConverter x:Key="InverseBoolToVisibility" Invert="True" />
     <i:InverseBoolConverter x:Key="InverseBool" />
+    <i:NotNullToVisibilityConverter x:Key="NotNullToVisibility" />
     <i:CountToVisibilityConverter x:Key="CountToVisibility" />
     <i:CountToVisibilityConverter x:Key="ZeroToVisibility" Invert="True" />
     <i:PositiveConverter x:Key="IsPositive" />
@@ -218,7 +220,59 @@
     </Style>
 
     <!-- Chat list -->
+
+    <!-- Section header: "Favorites · 2", "Online · 5", "Offline · 3" -->
+    <DataTemplate x:Key="SectionHeaderTemplate">
+        <TextBlock Margin="18,12,0,4" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubtleTextBrush}">
+            <Run Text="{Binding Name, Mode=OneWay}" />
+            <Run Text="·" />
+            <Run Text="{Binding ItemCount, Mode=OneWay}" />
+        </TextBlock>
+    </DataTemplate>
+
+    <!-- Right-click menu on a chat in either list. -->
+    <ContextMenu x:Key="ConversationMenu" x:Shared="False">
+        <MenuItem Header="Add to favorites" Command="{x:Static v:ChatActions.ToggleFavoriteCommand}" CommandParameter="{Binding}"
+                  Visibility="{Binding IsFavorite, Converter={StaticResource InverseBoolToVisibility}}">
+            <MenuItem.Icon>
+                <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE734;" />
+            </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Remove from favorites" Command="{x:Static v:ChatActions.ToggleFavoriteCommand}" CommandParameter="{Binding}"
+                  Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Icon>
+                <TextBlock FontFamily="{StaticResource IconFont}" Foreground="#E3A100" Text="&#xE735;" />
+            </MenuItem.Icon>
+        </MenuItem>
+        <Separator Visibility="{Binding IsGroup, Converter={StaticResource BoolToVisibility}}" />
+        <MenuItem Header="Rename group…" Command="{x:Static v:ChatActions.RenameGroupCommand}" CommandParameter="{Binding}"
+                  Visibility="{Binding IsGroup, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Icon>
+                <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE8AC;" />
+            </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Add people…" Command="{x:Static v:ChatActions.AddPeopleCommand}" CommandParameter="{Binding}"
+                  Visibility="{Binding IsGroup, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Icon>
+                <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE8FA;" />
+            </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Leave group" Command="{x:Static v:ChatActions.LeaveGroupCommand}" CommandParameter="{Binding}"
+                  Visibility="{Binding IsGroup, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Icon>
+                <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE89B;" />
+            </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="Delete chat" Command="{x:Static v:ChatActions.DeleteChatCommand}" CommandParameter="{Binding}"
+                  Visibility="{Binding IsGroup, Converter={StaticResource BoolToVisibility}}">
+            <MenuItem.Icon>
+                <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE74D;" />
+            </MenuItem.Icon>
+        </MenuItem>
+    </ContextMenu>
+
     <Style x:Key="ConversationItemStyle" TargetType="ListBoxItem">
+        <Setter Property="ContextMenu" Value="{StaticResource ConversationMenu}" />
         <Setter Property="Margin" Value="6,1" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -260,8 +314,15 @@
                       ShowPresence="{Binding IsGroup, Converter={StaticResource InverseBool}}"
                       IsOnline="{Binding Peer.IsOnline, FallbackValue=False}" />
 
-            <TextBlock x:Name="TitleText" Grid.Column="1" Text="{Binding Title}" FontSize="14"
-                       Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
+            <DockPanel Grid.Column="1">
+                <!-- Ripples from this person are blocked. -->
+                <TextBlock DockPanel.Dock="Right" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="11"
+                           FontFamily="{StaticResource IconFont}" Foreground="#C4314B" Text="&#xE733;"
+                           ToolTip="Ripples from this person are blocked"
+                           Visibility="{Binding Peer.RippleBlocked, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="14"
+                           Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
             <TextBlock Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="11"
                        Foreground="{StaticResource SubtleTextBrush}"
                        Text="{Binding LastActivityUtc, Converter={StaticResource ListTime}}" />

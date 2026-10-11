@@ -11,6 +11,8 @@ namespace MiniLocalChat.Services;
 
 /// <summary>
 /// Owns all chat state. Everything here runs on the UI thread; network callbacks are marshalled in.
+/// Message actions (edit, delete, react, reply, forward) are in ChatService.Actions.cs,
+/// group management in ChatService.Groups.cs.
 /// </summary>
 public sealed partial class ChatService : ObservableObject
 {
@@ -19,6 +21,7 @@ public sealed partial class ChatService : ObservableObject
     private const string SettingsFile = "settings.json";
     private const string ContactsFile = "contacts.json";
     private const string ConversationsFile = "conversations.json";
+    private const string OutboxFile = "outbox.json";
     private const string DirectPrefix = "dm:";
     private const string GroupPrefix = "grp:";
     private const int MaxGroupMembers = 256;
@@ -29,9 +32,11 @@ public sealed partial class ChatService : ObservableObject
     private readonly Storage _storage = new();
     private readonly Dictionary<string, Contact> _contactsByIp = new();
     private readonly Dictionary<string, Conversation> _conversationsById = new();
+    private readonly Dictionary<Guid, (Conversation Conversation, ChatMessage Message)> _messageIndex = new();
     private readonly HashSet<Guid> _knownMessageIds = new();
     private readonly DispatcherTimer _saveTimer;
     private readonly DispatcherTimer _maintenanceTimer;
+    private List<PendingControl> _outbox = [];
     private HashSet<string> _localIps = new();
     private volatile string[] _knownIps = [];
     private PeerServer? _server;
@@ -50,6 +55,7 @@ public sealed partial class ChatService : ObservableObject
         _maintenanceTimer.Tick += (_, _) => Maintenance();
     }
 
+    /// <summary>A new chat message arrived (not edits, reactions or group changes).</summary>
     public event Action<Conversation, ChatMessage>? MessageReceived;
 
     public AppSettings Settings { get; private set; } = new();
@@ -117,6 +123,7 @@ public sealed partial class ChatService : ObservableObject
             EnsureDirect(contact.Ip);
         }
 
+        _outbox = _storage.Load<List<PendingControl>>(OutboxFile) ?? [];
         RecomputeUnread();
     }
 
@@ -136,16 +143,23 @@ public sealed partial class ChatService : ObservableObject
             item => PeerClient.SendAsync(BindAddress, item.RecipientIp, port, item.Header, item.FilePath),
             (item, state) => _ui.InvokeAsync(() => OnDeliveryCompleted(item, state)));
 
-        // Anything still undelivered from last time goes back in the queue.
+        // Anything still undelivered from last time goes back in the queue, in the original order.
+        var pending = new List<(DateTime When, OutgoingItem Item)>();
         foreach (var conversation in Conversations)
         {
             foreach (var message in conversation.Messages.Where(m => m.IsMine))
             {
                 foreach (var ip in message.Delivery.Where(d => d.Value == DeliveryState.Pending).Select(d => d.Key).ToList())
                 {
-                    _queue.Enqueue(CreateOutgoing(conversation, message, ip));
+                    pending.Add((message.SentUtc, CreateOutgoing(conversation, message, ip)));
                 }
             }
+        }
+
+        pending.AddRange(_outbox.Select(p => (p.Header.SentUtc, new OutgoingItem(null, p.RecipientIp, p.Header, null))));
+        foreach (var (_, item) in pending.OrderBy(p => p.When))
+        {
+            _queue.Enqueue(item);
         }
 
         _maintenanceTimer.Start();
@@ -239,6 +253,9 @@ public sealed partial class ChatService : ObservableObject
     public bool IsSelf(string ip) =>
         ip == Me.Ip || (BindAddress is null && (_localIps.Contains(ip) || IPAddress.IsLoopback(IPAddress.Parse(ip))));
 
+    public string NameOf(string ip) =>
+        ip == Me.Ip ? "You" : _contactsByIp.TryGetValue(ip, out var contact) ? contact.DisplayName : ip;
+
     public Conversation GetOrCreateDirect(string ip) =>
         _conversationsById.TryGetValue(DirectPrefix + ip, out var existing)
             ? existing
@@ -269,32 +286,6 @@ public sealed partial class ChatService : ObservableObject
         return conversation;
     }
 
-    public Conversation CreateGroup(IEnumerable<string> ips, string? name)
-    {
-        var members = ips.Select(NetUtil.Normalize).OfType<string>().Where(ip => !IsSelf(ip)).Distinct().ToList();
-        if (members.Count == 0)
-        {
-            throw new ArgumentException("A chat needs at least one other person.", nameof(ips));
-        }
-
-        if (members.Count == 1 && string.IsNullOrWhiteSpace(name))
-        {
-            return GetOrCreateDirect(members[0]);
-        }
-
-        var conversation = new Conversation
-        {
-            Id = GroupPrefix + Guid.NewGuid().ToString("N"),
-            IsGroup = true,
-            GroupName = string.IsNullOrWhiteSpace(name) ? null : name.Trim(),
-            MemberIps = members,
-            LastActivityUtc = DateTime.UtcNow,
-        };
-        Register(conversation);
-        ScheduleSave();
-        return conversation;
-    }
-
     public Conversation? MostRecentUnread() =>
         Conversations.Where(c => c.UnreadCount > 0).MaxBy(c => c.LastActivityUtc);
 
@@ -307,36 +298,16 @@ public sealed partial class ChatService : ObservableObject
         }
     }
 
+    public void ToggleFavorite(Conversation conversation)
+    {
+        conversation.IsFavorite = !conversation.IsFavorite;
+        ScheduleSave();
+    }
+
     // ---- Sending --------------------------------------------------------------------------------
 
     public static bool IsImageFile(string path) =>
         ImageExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
-
-    public void SendText(Conversation conversation, string text)
-    {
-        text = text.Trim();
-        if (text.Length > 0)
-        {
-            Post(conversation, new ChatMessage { Kind = MessageKind.Text, Text = text });
-        }
-    }
-
-    public void SendFile(Conversation conversation, string path)
-    {
-        var info = new FileInfo(path);
-        if (!info.Exists)
-        {
-            return;
-        }
-
-        Post(conversation, new ChatMessage
-        {
-            Kind = IsImageFile(path) ? MessageKind.Image : MessageKind.File,
-            FileName = info.Name,
-            FileSize = info.Length,
-            LocalPath = info.FullName,
-        });
-    }
 
     private void Post(Conversation conversation, ChatMessage message)
     {
@@ -346,14 +317,14 @@ public sealed partial class ChatService : ObservableObject
         message.SentUtc = DateTime.UtcNow;
         message.Sender = Me;
 
-        var recipients = conversation.MemberIps.Where(ip => !IsSelf(ip)).ToList();
+        var recipients = Recipients(conversation);
         foreach (var ip in recipients)
         {
             message.Delivery[ip] = DeliveryState.Pending;
         }
 
         _knownMessageIds.Add(message.Id);
-        conversation.AddMessage(message);
+        AddToConversation(conversation, message);
         foreach (var ip in recipients)
         {
             _queue?.Enqueue(CreateOutgoing(conversation, message, ip));
@@ -362,18 +333,34 @@ public sealed partial class ChatService : ObservableObject
         ScheduleSave();
     }
 
+    private List<string> Recipients(Conversation conversation) =>
+        conversation.MemberIps.Where(ip => !IsSelf(ip)).ToList();
+
     private OutgoingItem CreateOutgoing(Conversation conversation, ChatMessage message, string recipientIp)
+    {
+        var header = NewHeader(WireTypes.Chat, conversation);
+        header.Id = message.Id;
+        header.SentUtc = message.SentUtc;
+        header.Kind = message.Kind;
+        header.Text = message.Kind == MessageKind.Text ? message.Text : null;
+        header.FileName = message.FileName;
+        header.FileSize = message.FileSize;
+        header.ReplyTo = message.ReplyTo;
+        header.Forwarded = message.IsForwarded;
+
+        return new OutgoingItem(message, recipientIp, header, message.Kind == MessageKind.Text ? null : message.LocalPath);
+    }
+
+    /// <summary>A header with my identity and, for groups, the group's id, name and members.</summary>
+    private WireHeader NewHeader(string type, Conversation conversation)
     {
         var header = new WireHeader
         {
-            Id = message.Id,
+            Type = type,
+            Id = Guid.NewGuid(),
             Nick = Me.Nickname,
             Colors = MyColors(),
-            Kind = message.Kind,
-            Text = message.Kind == MessageKind.Text ? message.Text : null,
-            FileName = message.FileName,
-            FileSize = message.FileSize,
-            SentUtc = message.SentUtc,
+            SentUtc = DateTime.UtcNow,
         };
 
         if (conversation.IsGroup)
@@ -383,12 +370,33 @@ public sealed partial class ChatService : ObservableObject
             header.Members = [.. conversation.MemberIps, Me.Ip];
         }
 
-        return new OutgoingItem(message, recipientIp, header, message.Kind == MessageKind.Text ? null : message.LocalPath);
+        return header;
+    }
+
+    /// <summary>Queues an edit/delete/reaction/group change for everyone in the chat; survives restarts.</summary>
+    private void SendControl(WireHeader header, IEnumerable<string> recipients)
+    {
+        _knownMessageIds.Add(header.Id);
+        foreach (var ip in recipients.Where(ip => !IsSelf(ip)).Distinct())
+        {
+            _outbox.Add(new PendingControl { RecipientIp = ip, Header = header });
+            _queue?.Enqueue(new OutgoingItem(null, ip, header, null));
+        }
+
+        ScheduleSave();
     }
 
     private void OnDeliveryCompleted(OutgoingItem item, DeliveryState state)
     {
-        item.Message.SetDelivery(item.RecipientIp, state);
+        if (item.Message is { } message)
+        {
+            message.SetDelivery(item.RecipientIp, state);
+        }
+        else
+        {
+            _outbox.RemoveAll(p => p.Header.Id == item.Header.Id && p.RecipientIp == item.RecipientIp);
+        }
+
         if (state == DeliveryState.Sent && _contactsByIp.TryGetValue(item.RecipientIp, out var contact))
         {
             MarkSeen(contact);
@@ -417,53 +425,114 @@ public sealed partial class ChatService : ObservableObject
         MarkSeen(sender);
 
         // Already have it: the sender missed our ACK and retried.
-        if (header.Type != "chat" || !_knownMessageIds.Add(header.Id))
+        if (!_knownMessageIds.Add(header.Id))
         {
             return true;
         }
 
-        Conversation conversation;
-        if (string.IsNullOrEmpty(header.GroupId))
+        switch (header.Type)
         {
-            conversation = GetOrCreateDirect(senderIp);
+            case WireTypes.Chat:
+                ReceiveChat(header, sender, packet.FilePath);
+                break;
+            case WireTypes.Edit:
+                ReceiveEdit(header, sender);
+                break;
+            case WireTypes.Delete:
+                ReceiveDelete(header, sender);
+                break;
+            case WireTypes.React:
+                ReceiveReaction(header, sender);
+                break;
+            case WireTypes.Group:
+                ReceiveGroupChange(header, sender);
+                break;
         }
-        else if (GroupIdPattern().IsMatch(header.GroupId))
+
+        ScheduleSave();
+        return true;
+    }
+
+    private void ReceiveChat(WireHeader header, Contact sender, string? filePath)
+    {
+        if (FindConversationFor(header, sender.Ip, create: true) is not { } conversation)
         {
-            conversation = GetOrCreateGroupFromWire(header, senderIp);
-        }
-        else
-        {
-            return true;
+            return;
         }
 
         var message = new ChatMessage
         {
             Id = header.Id,
-            SenderIp = senderIp,
+            SenderIp = sender.Ip,
             SentUtc = header.SentUtc == default ? DateTime.UtcNow : header.SentUtc,
-            Kind = header.Kind,
+            Kind = header.Kind == MessageKind.System ? MessageKind.Text : header.Kind,
             Text = header.Text ?? "",
             FileName = header.FileName is null ? null : Wire.SafeFileName(header.FileName),
             FileSize = header.FileSize,
-            LocalPath = packet.FilePath,
+            LocalPath = filePath,
+            ReplyTo = CleanReply(header.ReplyTo),
+            IsForwarded = header.Forwarded,
             Sender = sender,
         };
 
-        conversation.AddMessage(message);
+        AddToConversation(conversation, message);
         if (!IsConversationVisible(conversation))
         {
             conversation.UnreadCount++;
         }
 
         MessageReceived?.Invoke(conversation, message);
-        ScheduleSave();
-        return true;
     }
 
-    private Conversation GetOrCreateGroupFromWire(WireHeader header, string senderIp)
+    /// <summary>
+    /// The chat a packet belongs to: the sender's 1:1 chat, or the group named in it. Messages for a
+    /// group I left are dropped. A group I don't have yet is created from the packet when allowed.
+    /// </summary>
+    private Conversation? FindConversationFor(WireHeader header, string senderIp, bool create)
     {
-        var id = GroupPrefix + header.GroupId;
-        var members = (header.Members ?? [])
+        if (string.IsNullOrEmpty(header.GroupId))
+        {
+            return GetOrCreateDirect(senderIp);
+        }
+
+        if (!GroupIdPattern().IsMatch(header.GroupId) || Settings.LeftGroupIds.Contains(header.GroupId))
+        {
+            return null;
+        }
+
+        if (_conversationsById.TryGetValue(GroupPrefix + header.GroupId, out var conversation))
+        {
+            // Someone I didn't know was in the group: they must have been added while I was away.
+            if (!conversation.MemberIps.Contains(senderIp))
+            {
+                conversation.MemberIps.Add(senderIp);
+                conversation.Members.Add(GetOrCreateContact(senderIp));
+                conversation.RefreshDisplay();
+            }
+
+            return conversation;
+        }
+
+        if (!create)
+        {
+            return null;
+        }
+
+        conversation = new Conversation
+        {
+            Id = GroupPrefix + header.GroupId,
+            IsGroup = true,
+            GroupName = CleanGroupName(header.GroupName),
+            MemberIps = WireMembers(header, senderIp),
+            LastActivityUtc = DateTime.UtcNow,
+        };
+        Register(conversation);
+        return conversation;
+    }
+
+    /// <summary>The members listed in a packet (minus me), plus its sender.</summary>
+    private List<string> WireMembers(WireHeader header, string senderIp) =>
+        (header.Members ?? [])
             .Take(MaxGroupMembers)
             .Select(NetUtil.Normalize)
             .OfType<string>()
@@ -471,36 +540,23 @@ public sealed partial class ChatService : ObservableObject
             .Where(ip => !IsSelf(ip))
             .Distinct()
             .ToList();
-        var groupName = string.IsNullOrWhiteSpace(header.GroupName) ? null : header.GroupName.Trim();
 
-        if (_conversationsById.TryGetValue(id, out var conversation))
-        {
-            foreach (var ip in members.Where(ip => !conversation.MemberIps.Contains(ip)))
-            {
-                conversation.MemberIps.Add(ip);
-                conversation.Members.Add(GetOrCreateContact(ip));
-            }
-
-            if (groupName is not null)
-            {
-                conversation.GroupName = groupName;
-            }
-
-            conversation.RefreshDisplay();
-            return conversation;
-        }
-
-        conversation = new Conversation
-        {
-            Id = id,
-            IsGroup = true,
-            GroupName = groupName,
-            MemberIps = members,
-            LastActivityUtc = DateTime.UtcNow,
-        };
-        Register(conversation);
-        return conversation;
+    private static string? CleanGroupName(string? name)
+    {
+        var clean = name?.ReplaceLineEndings(" ").Trim();
+        return string.IsNullOrEmpty(clean) ? null : clean.Length > 60 ? clean[..60] : clean;
     }
+
+    private static ReplyInfo? CleanReply(ReplyInfo? reply) =>
+        reply is null ? null : new ReplyInfo
+        {
+            Id = reply.Id,
+            SenderName = Truncate(reply.SenderName, MaxNicknameLength),
+            Preview = Truncate(reply.Preview, ReplyInfo.MaxPreviewLength),
+        };
+
+    private static string Truncate(string? text, int max) =>
+        text is null ? "" : text.Length > max ? text[..max] : text;
 
     private void HandlePresence(string rawIp, PresencePacket packet)
     {
@@ -581,8 +637,10 @@ public sealed partial class ChatService : ObservableObject
         conversation.Members.AddRange(conversation.MemberIps.Select(GetOrCreateContact));
         foreach (var message in conversation.Messages)
         {
-            message.Sender = message.IsMine ? Me : GetOrCreateContact(message.SenderIp);
+            message.Sender = message.IsMine ? Me : message.Kind == MessageKind.System ? null : GetOrCreateContact(message.SenderIp);
             _knownMessageIds.Add(message.Id);
+            _messageIndex[message.Id] = (conversation, message);
+            message.RefreshReactions(Me.Ip, NameOf);
         }
 
         conversation.PropertyChanged += OnConversationPropertyChanged;
@@ -591,17 +649,62 @@ public sealed partial class ChatService : ObservableObject
         conversation.RefreshDisplay();
     }
 
+    private void AddToConversation(Conversation conversation, ChatMessage message)
+    {
+        _messageIndex[message.Id] = (conversation, message);
+        conversation.AddMessage(message);
+    }
+
+    /// <summary>A gray centered line in the chat, e.g. "Alice left the group". Local only.</summary>
+    private void AddSystemMessage(Conversation conversation, string text)
+    {
+        var message = new ChatMessage { Id = Guid.NewGuid(), Kind = MessageKind.System, Text = text, SentUtc = DateTime.UtcNow };
+        _knownMessageIds.Add(message.Id);
+        AddToConversation(conversation, message);
+    }
+
+    /// <summary>Takes a chat off my list (delete chat / leave group).</summary>
+    private void RemoveConversation(Conversation conversation)
+    {
+        conversation.PropertyChanged -= OnConversationPropertyChanged;
+        _conversationsById.Remove(conversation.Id);
+        foreach (var message in conversation.Messages)
+        {
+            _messageIndex.Remove(message.Id);
+        }
+
+        Conversations.Remove(conversation);
+        RecomputeUnread();
+        ScheduleSave();
+    }
+
     private void OnContactPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(Contact.Nickname) or nameof(Contact.Color1) or nameof(Contact.Color2)
-            && sender is Contact contact)
+        if (sender is not Contact contact)
         {
-            foreach (var conversation in Conversations.Where(c => c.Members.Contains(contact)))
-            {
-                conversation.RefreshDisplay();
-            }
+            return;
+        }
 
-            ScheduleSave();
+        switch (e.PropertyName)
+        {
+            case nameof(Contact.RippleBlocked):
+                ScheduleSave();
+                break;
+            case nameof(Contact.IsOnline):
+                foreach (var conversation in Conversations.Where(c => c.Members.Contains(contact)))
+                {
+                    conversation.RefreshPresence();
+                }
+
+                break;
+            case nameof(Contact.Nickname) or nameof(Contact.Color1) or nameof(Contact.Color2):
+                foreach (var conversation in Conversations.Where(c => c.Members.Contains(contact)))
+                {
+                    conversation.RefreshDisplay();
+                }
+
+                ScheduleSave();
+                break;
         }
     }
 
@@ -650,6 +753,7 @@ public sealed partial class ChatService : ObservableObject
         {
             _storage.Save(ContactsFile, Contacts.ToList());
             _storage.Save(ConversationsFile, Conversations.ToList());
+            _storage.Save(OutboxFile, _outbox);
         }
         catch (IOException ex)
         {

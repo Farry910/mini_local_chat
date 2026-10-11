@@ -4,6 +4,9 @@ A Teams-style private chat for computers on the same local network (e.g. a `192.
 
 - **Identity = IP address.** Each computer keeps a fixed IP; its user picks a nickname, and everyone else sees that nickname for that IP.
 - **1:1 and group chats** (pick several people in *New chat*), text, emoji, files and images (attach, drag & drop, or paste).
+- **Teams-style messages.** Hover a message for quick reactions (👍 ❤️ 😆 😮 😢 😡) and ⋯ → Reply, Forward, Copy, Edit, Delete (edit/delete your own). Replies quote the original (click to jump to it); edits and deletes update for everyone. **Find in chat** with Ctrl+F.
+- **Group chats:** rename, add people, leave (others are told), or delete the chat from your list.
+- **Chat list sections:** Favorites, Online, Offline (☆ a chat to pin it), with search in both the full window and the floating panel.
 - **Offline delivery.** Messages to someone who is offline are queued and sent automatically when they come back online.
 - **Tray + floating LED.** Closing the window hides it to the tray. A small LED sits at the left or right edge of the screen:
   - dark: nothing new

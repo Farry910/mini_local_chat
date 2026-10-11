@@ -3,7 +3,8 @@ using MiniLocalChat.Models;
 
 namespace MiniLocalChat.Network;
 
-public sealed record OutgoingItem(ChatMessage Message, string RecipientIp, WireHeader Header, string? FilePath);
+/// <param name="Message">The chat message being delivered, or null for an edit/delete/reaction/group change.</param>
+public sealed record OutgoingItem(ChatMessage? Message, string RecipientIp, WireHeader Header, string? FilePath);
 
 /// <summary>
 /// Per-recipient FIFO of undelivered messages. Each recipient drains in order; on the first failure

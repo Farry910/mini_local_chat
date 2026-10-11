@@ -40,7 +40,7 @@ public static class Wire
 
 public sealed class WireHeader
 {
-    public string Type { get; set; } = "chat";
+    public string Type { get; set; } = WireTypes.Chat;
 
     public Guid Id { get; set; }
 
@@ -67,6 +67,49 @@ public sealed class WireHeader
     public long FileSize { get; set; }
 
     public DateTime SentUtc { get; set; }
+
+    /// <summary>"chat": the message this one replies to.</summary>
+    public ReplyInfo? ReplyTo { get; set; }
+
+    /// <summary>"chat": a forwarded copy of another message.</summary>
+    public bool Forwarded { get; set; }
+
+    /// <summary>"edit" / "delete" / "react": the message acted on.</summary>
+    public Guid? TargetId { get; set; }
+
+    /// <summary>"react": add (true) or remove (false) the emoji in <see cref="Text"/>.</summary>
+    public bool On { get; set; }
+
+    /// <summary>"group": one of <see cref="GroupActions"/>.</summary>
+    public string? Action { get; set; }
+}
+
+/// <summary>
+/// Packet types. Everything but "chat" changes something that already exists. Older app versions
+/// ignore types they don't know (and still acknowledge them).
+/// </summary>
+public static class WireTypes
+{
+    public const string Chat = "chat";
+    public const string Edit = "edit";
+    public const string Delete = "delete";
+    public const string React = "react";
+    public const string Group = "group";
+}
+
+public static class GroupActions
+{
+    public const string Rename = "rename";
+    public const string Add = "add";
+    public const string Leave = "leave";
+}
+
+/// <summary>An edit/delete/reaction/group change still waiting to reach someone; kept across restarts.</summary>
+public sealed class PendingControl
+{
+    public string RecipientIp { get; set; } = "";
+
+    public WireHeader Header { get; set; } = new();
 }
 
 public sealed record IncomingPacket(string SenderIp, WireHeader Header, string? FilePath);

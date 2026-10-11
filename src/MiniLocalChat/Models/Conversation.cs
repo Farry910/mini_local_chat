@@ -8,9 +8,13 @@ namespace MiniLocalChat.Models;
 /// <summary>A 1:1 chat ("dm:&lt;ip&gt;") or a group chat ("grp:&lt;id&gt;", the id is shared by all members).</summary>
 public sealed class Conversation : ObservableObject
 {
+    /// <summary>Chat list sections, top to bottom.</summary>
+    public static readonly string[] Sections = ["Favorites", "Online", "Offline"];
+
     private string? _groupName;
     private int _unreadCount;
     private DateTime _lastActivityUtc;
+    private bool _isFavorite;
 
     public string Id { get; set; } = "";
 
@@ -45,7 +49,7 @@ public sealed class Conversation : ObservableObject
         }
     }
 
-    /// <summary>Sort key: chats with new messages go to the top of the floating panel.</summary>
+    /// <summary>Sort key: chats with new messages go to the top of their section.</summary>
     [JsonIgnore]
     public bool HasUnread => UnreadCount > 0;
 
@@ -55,11 +59,35 @@ public sealed class Conversation : ObservableObject
         set => Set(ref _lastActivityUtc, value);
     }
 
+    /// <summary>Pinned to the Favorites section at the top of the chat list.</summary>
+    public bool IsFavorite
+    {
+        get => _isFavorite;
+        set
+        {
+            if (Set(ref _isFavorite, value))
+            {
+                RefreshPresence();
+            }
+        }
+    }
+
     [JsonIgnore]
     public List<Contact> Members { get; } = [];
 
     [JsonIgnore]
     public Contact? Peer => IsGroup ? null : Members.FirstOrDefault();
+
+    /// <summary>1:1: the person is online. Group: anyone in it is.</summary>
+    [JsonIgnore]
+    public bool IsOnline => Members.Any(m => m.IsOnline);
+
+    /// <summary>Favorites, Online or Offline.</summary>
+    [JsonIgnore]
+    public string Section => Sections[SectionOrder];
+
+    [JsonIgnore]
+    public int SectionOrder => IsFavorite ? 0 : IsOnline ? 1 : 2;
 
     [JsonIgnore]
     public string Title
@@ -103,10 +131,19 @@ public sealed class Conversation : ObservableObject
             }
 
             var last = Messages[^1];
-            var prefix = last.IsMine ? "You: " : IsGroup ? $"{last.Sender?.DisplayName}: " : "";
+            var prefix = last.Kind == MessageKind.System ? ""
+                : last.IsMine ? "You: "
+                : IsGroup ? $"{last.Sender?.DisplayName}: "
+                : "";
             return prefix + last.Preview;
         }
     }
+
+    /// <summary>Matches the search box: the chat's title or any member's name.</summary>
+    public bool Matches(string search) =>
+        search.Length == 0
+        || Title.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+        || Members.Any(m => m.DisplayName.Contains(search, StringComparison.CurrentCultureIgnoreCase) || m.Ip.Contains(search));
 
     public void AddMessage(ChatMessage message)
     {
@@ -125,5 +162,17 @@ public sealed class Conversation : ObservableObject
         OnPropertyChanged(nameof(AvatarBrush));
         OnPropertyChanged(nameof(AvatarRing));
         OnPropertyChanged(nameof(LastPreview));
+        RefreshPresence();
     }
+
+    /// <summary>Call when someone in the chat goes online or offline.</summary>
+    public void RefreshPresence()
+    {
+        OnPropertyChanged(nameof(IsOnline));
+        OnPropertyChanged(nameof(SectionOrder));
+        OnPropertyChanged(nameof(Section));
+    }
+
+    /// <summary>Call when a message was edited or deleted.</summary>
+    public void RefreshPreview() => OnPropertyChanged(nameof(LastPreview));
 }

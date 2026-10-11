@@ -34,4 +34,7 @@ public sealed class AppSettings
     public int RippleMinGapSeconds { get; set; } = 3;
 
     public bool TrayHintShown { get; set; }
+
+    /// <summary>Group chats I left: their messages are ignored unless someone adds me back.</summary>
+    public List<string> LeftGroupIds { get; set; } = [];
 }

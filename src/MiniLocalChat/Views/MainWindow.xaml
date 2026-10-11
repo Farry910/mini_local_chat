@@ -63,7 +63,7 @@
                         <Grid Margin="6,0,0,0">
                             <TextBox x:Name="SearchBox" Style="{StaticResource BareTextBox}" FontSize="13" TextChanged="OnSearchChanged" />
                             <TextBlock Margin="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" FontSize="13"
-                                       Foreground="#8A8A8A" Text="Search chats"
+                                       Foreground="#8A8A8A" Text="Search people and chats"
                                        Visibility="{Binding Text, ElementName=SearchBox, Converter={StaticResource EmptyToVisible}}" />
                         </Grid>
                     </DockPanel>
@@ -74,7 +74,11 @@
                          ItemTemplate="{StaticResource ConversationItemTemplate}"
                          ItemContainerStyle="{StaticResource ConversationItemStyle}"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         SelectionChanged="OnSelectionChanged" />
+                         SelectionChanged="OnSelectionChanged">
+                    <ListBox.GroupStyle>
+                        <GroupStyle HidesIfEmpty="True" HeaderTemplate="{StaticResource SectionHeaderTemplate}" />
+                    </ListBox.GroupStyle>
+                </ListBox>
 
                 <TextBlock Grid.Row="2" Margin="24,30" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                            FontSize="13" Foreground="{StaticResource SubtleTextBrush}"

@@ -68,8 +68,8 @@ public sealed class RippleController
     {
         var settings = _chat.Settings;
 
-        // Already read (the chat is open on screen) or switched off.
-        if (!settings.RippleEnabled || conversation.UnreadCount == 0 || message.Sender is not { } sender)
+        // Already read (the chat is open on screen), switched off, or I've blocked ripples from this person.
+        if (!settings.RippleEnabled || conversation.UnreadCount == 0 || message.Sender is not { RippleBlocked: false } sender)
         {
             return;
         }

@@ -8,17 +8,32 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextBrush}" Text="New chat" />
-        <TextBlock Grid.Row="1" Margin="0,4,0,12" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource SubtleTextBrush}"
+        <TextBlock x:Name="Heading" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextBrush}" Text="New chat" />
+        <TextBlock x:Name="Description" Grid.Row="1" Margin="0,4,0,12" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource SubtleTextBrush}"
                    Text="Pick one person for a private chat, or several people for a group chat." />
 
-        <Border Grid.Row="2" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1" CornerRadius="4">
+        <Border Grid.Row="2" Height="32" Margin="0,0,0,8" Background="White" CornerRadius="4"
+                BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+            <DockPanel Margin="8,0">
+                <TextBlock VerticalAlignment="Center" FontSize="12" FontFamily="{StaticResource IconFont}"
+                           Foreground="{StaticResource SubtleTextBrush}" Text="&#xE721;" />
+                <Grid Margin="6,0,0,0">
+                    <TextBox x:Name="SearchBox" Style="{StaticResource BareTextBox}" FontSize="13" TextChanged="OnSearchChanged" />
+                    <TextBlock Margin="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" FontSize="13"
+                               Foreground="#8A8A8A" Text="Search people"
+                               Visibility="{Binding Text, ElementName=SearchBox, Converter={StaticResource EmptyToVisible}}" />
+                </Grid>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="3" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1" CornerRadius="4">
             <Grid>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <ItemsControl x:Name="PeopleList" Margin="4">
@@ -46,7 +61,7 @@
             </Grid>
         </Border>
 
-        <StackPanel Grid.Row="3">
+        <StackPanel Grid.Row="4">
             <TextBlock Style="{StaticResource FieldLabel}" Text="Add someone by IP address" />
             <DockPanel>
                 <Button DockPanel.Dock="Right" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" MinWidth="70"
@@ -56,12 +71,12 @@
             <TextBlock x:Name="IpError" Margin="0,4,0,0" FontSize="12" Foreground="#C4314B" Visibility="Collapsed" />
         </StackPanel>
 
-        <StackPanel x:Name="GroupPanel" Grid.Row="4" Visibility="Collapsed">
+        <StackPanel x:Name="GroupPanel" Grid.Row="5" Visibility="Collapsed">
             <TextBlock Style="{StaticResource FieldLabel}" Text="Group name (optional)" />
             <TextBox x:Name="GroupNameBox" Style="{StaticResource FieldTextBox}" MaxLength="60" />
         </StackPanel>
 
-        <StackPanel Grid.Row="5" Margin="0,20,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+        <StackPanel Grid.Row="6" Margin="0,20,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
             <Button Style="{StaticResource SecondaryButton}" Content="Cancel" IsCancel="True" />
             <Button x:Name="StartButton" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" Content="Start chat"
                     IsDefault="True" IsEnabled="False" Click="OnStart" />

@@ -3,11 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:m="clr-namespace:MiniLocalChat.Models"
              xmlns:c="clr-namespace:MiniLocalChat.Controls"
+             xmlns:v="clr-namespace:MiniLocalChat.Views"
              AllowDrop="True" DragOver="OnDragOver" Drop="OnDrop"
              Background="{StaticResource ChatBackgroundBrush}">
     <UserControl.Resources>
 
-        <!-- Text, image or file card, depending on the message kind -->
+        <!-- Text, image or file card, depending on the message kind; or the "deleted" note -->
         <DataTemplate x:Key="MessageBodyTemplate" DataType="{x:Type m:ChatMessage}">
             <Grid>
                 <TextBlock x:Name="TextPart" Text="{Binding Text}" TextWrapping="Wrap" FontSize="14"
@@ -52,16 +53,135 @@
                     <Setter TargetName="TextPart" Property="Visibility" Value="Collapsed" />
                     <Setter TargetName="FilePart" Property="Visibility" Value="Visible" />
                 </DataTrigger>
+                <!-- Last, so it wins over the kind triggers. -->
+                <DataTrigger Binding="{Binding IsDeleted}" Value="True">
+                    <Setter TargetName="TextPart" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="TextPart" Property="Text" Value="This message has been deleted." />
+                    <Setter TargetName="TextPart" Property="FontStyle" Value="Italic" />
+                    <Setter TargetName="TextPart" Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
+                    <Setter TargetName="ImagePart" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="FilePart" Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
 
-        <ContextMenu x:Key="BubbleMenu" x:Shared="False">
-            <MenuItem Header="Copy" Click="OnCopyMessage" />
-        </ContextMenu>
+        <!-- "Forwarded" label + reply quote + body: the inside of a bubble -->
+        <DataTemplate x:Key="BubbleContentTemplate" DataType="{x:Type m:ChatMessage}">
+            <StackPanel>
+                <TextBlock Margin="0,0,0,4" FontSize="11" FontStyle="Italic" Foreground="{StaticResource SubtleTextBrush}"
+                           Visibility="{Binding IsForwarded, Converter={StaticResource BoolToVisibility}}">
+                    <Run FontFamily="{StaticResource IconFont}" Text="&#xE72D;" /> Forwarded
+                </TextBlock>
+                <Border Margin="0,0,0,6" Padding="8,4" Background="#0F000000" BorderBrush="{StaticResource AccentBrush}"
+                        BorderThickness="3,0,0,0" CornerRadius="2" Cursor="Hand" ToolTip="Go to the original message"
+                        MouseLeftButtonUp="OnReplyQuoteClick"
+                        Visibility="{Binding ReplyTo, Converter={StaticResource NotNullToVisibility}}">
+                    <StackPanel>
+                        <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Text="{Binding ReplyTo.SenderName}" />
+                        <TextBlock FontSize="12" FontFamily="{StaticResource TextFont}" Foreground="{StaticResource SubtleTextBrush}"
+                                   Text="{Binding ReplyTo.Preview}" TextTrimming="CharacterEllipsis" MaxHeight="34" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MessageBodyTemplate}" Focusable="False" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Hover bar: quick reactions + "more" -->
+        <Style x:Key="ToolbarEmojiButton" TargetType="Button">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontFamily" Value="Segoe UI Emoji" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4">
+                            <ContentPresenter x:Name="Face" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentLightBrush}" />
+                                <Setter TargetName="Face" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="1.2" ScaleY="1.2" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="MessageToolbarTemplate" DataType="{x:Type m:ChatMessage}">
+            <Border Padding="3" Background="White" CornerRadius="6" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="6" ShadowDepth="1" Opacity="0.15" />
+                </Border.Effect>
+                <StackPanel Orientation="Horizontal">
+                    <ItemsControl ItemsSource="{x:Static m:ChatMessage.QuickReactions}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource ToolbarEmojiButton}" Content="{Binding}" Click="OnQuickReact" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border Width="1" Margin="3,4" Background="{StaticResource DividerBrush}" />
+                    <Button Width="28" Height="28" FontSize="14" Style="{StaticResource IconButton}" Content="&#xE712;"
+                            ToolTip="More options" Click="OnMoreActions" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- Reaction chips under a bubble -->
+        <Style x:Key="ReactionChipButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Padding="6,1" Background="White" CornerRadius="10"
+                                BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Mine}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentLightBrush}" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="ReactionChipTemplate" DataType="{x:Type m:ReactionChip}">
+            <Button Style="{StaticResource ReactionChipButton}" ToolTip="{Binding Names}" Click="OnReactionChipClick">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock FontFamily="Segoe UI Emoji" FontSize="13" Text="{Binding Emoji}" />
+                    <TextBlock Margin="4,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource TextBrush}" Text="{Binding Count}" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+
+        <ItemsPanelTemplate x:Key="WrapRow">
+            <WrapPanel />
+        </ItemsPanelTemplate>
 
         <!-- Someone else's message: avatar, name (groups), time, white bubble on the left -->
         <DataTemplate x:Key="OtherMessageTemplate" DataType="{x:Type m:ChatMessage}">
-            <Grid Margin="0,6,48,0" HorizontalAlignment="Left">
+            <Grid x:Name="Row" Margin="0,6,48,0" HorizontalAlignment="Left" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -73,38 +193,81 @@
                     <StackPanel Margin="0,0,0,3" Orientation="Horizontal">
                         <TextBlock Margin="0,0,8,0" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
                                    Text="{Binding Sender.DisplayName}"
-                                   Visibility="{Binding DataContext.IsGroup, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BoolToVisibility}}" />
+                                   Visibility="{Binding DataContext.IsGroup, RelativeSource={RelativeSource AncestorType=ItemsControl}, FallbackValue=Collapsed, Converter={StaticResource BoolToVisibility}}" />
                         <TextBlock FontSize="11" Foreground="{StaticResource SubtleTextBrush}"
                                    Text="{Binding SentUtc, Converter={StaticResource MessageTime}}" />
+                        <TextBlock Margin="6,0,0,0" FontSize="11" Foreground="{StaticResource SubtleTextBrush}" Text="Edited"
+                                   Visibility="{Binding IsEdited, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
-                    <Border HorizontalAlignment="Left" Padding="12,8" CornerRadius="6" Background="White"
-                            ContextMenu="{StaticResource BubbleMenu}"
-                            MaxWidth="{Binding BubbleMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}">
-                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MessageBodyTemplate}" Focusable="False" />
-                    </Border>
+                    <Grid HorizontalAlignment="Left">
+                        <Border Padding="12,8" CornerRadius="6" Background="White" MouseRightButtonUp="OnBubbleRightClick"
+                                MaxWidth="{Binding BubbleMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}">
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource BubbleContentTemplate}" Focusable="False" />
+                        </Border>
+                        <ContentControl x:Name="Toolbar" Content="{Binding}" ContentTemplate="{StaticResource MessageToolbarTemplate}" Focusable="False" Visibility="Collapsed"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-24,-6,0" Panel.ZIndex="1" />
+                    </Grid>
+                    <ItemsControl Margin="0,3,0,0" ItemsSource="{Binding ReactionChips}" ItemTemplate="{StaticResource ReactionChipTemplate}"
+                                  ItemsPanel="{StaticResource WrapRow}"
+                                  Visibility="{Binding ReactionChips.Count, Converter={StaticResource CountToVisibility}}" />
                 </StackPanel>
             </Grid>
+            <DataTemplate.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsMouseOver, ElementName=Row}" Value="True" />
+                        <Condition Binding="{Binding HasActions}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="Toolbar" Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
 
         <!-- My message: time, lavender bubble on the right, delivery status -->
         <DataTemplate x:Key="MineMessageTemplate" DataType="{x:Type m:ChatMessage}">
-            <StackPanel Margin="48,6,0,0" HorizontalAlignment="Right">
-                <TextBlock Margin="0,0,0,3" HorizontalAlignment="Right" FontSize="11" Foreground="{StaticResource SubtleTextBrush}"
-                           Text="{Binding SentUtc, Converter={StaticResource MessageTime}}" />
-                <Border HorizontalAlignment="Right" Padding="12,8" CornerRadius="6" Background="{StaticResource AccentLightBrush}"
-                        ContextMenu="{StaticResource BubbleMenu}"
-                        MaxWidth="{Binding BubbleMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}">
-                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MessageBodyTemplate}" Focusable="False" />
-                </Border>
+            <StackPanel x:Name="Row" Margin="48,6,0,0" HorizontalAlignment="Right" Background="Transparent">
+                <StackPanel Margin="0,0,0,3" HorizontalAlignment="Right" Orientation="Horizontal">
+                    <TextBlock Margin="0,0,6,0" FontSize="11" Foreground="{StaticResource SubtleTextBrush}" Text="Edited"
+                               Visibility="{Binding IsEdited, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock FontSize="11" Foreground="{StaticResource SubtleTextBrush}"
+                               Text="{Binding SentUtc, Converter={StaticResource MessageTime}}" />
+                </StackPanel>
+                <Grid HorizontalAlignment="Right">
+                    <Border Padding="12,8" CornerRadius="6" Background="{StaticResource AccentLightBrush}" MouseRightButtonUp="OnBubbleRightClick"
+                            MaxWidth="{Binding BubbleMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}">
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource BubbleContentTemplate}" Focusable="False" />
+                    </Border>
+                    <ContentControl x:Name="Toolbar" Content="{Binding}" ContentTemplate="{StaticResource MessageToolbarTemplate}" Focusable="False" Visibility="Collapsed"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-24,-6,0" Panel.ZIndex="1" />
+                </Grid>
+                <ItemsControl Margin="0,3,0,0" HorizontalAlignment="Right" ItemsSource="{Binding ReactionChips}"
+                              ItemTemplate="{StaticResource ReactionChipTemplate}" ItemsPanel="{StaticResource WrapRow}"
+                              Visibility="{Binding ReactionChips.Count, Converter={StaticResource CountToVisibility}}" />
                 <TextBlock Margin="0,2,2,0" HorizontalAlignment="Right" FontSize="11" Foreground="{StaticResource SubtleTextBrush}"
                            Text="{Binding DeliveryText}"
                            Visibility="{Binding DeliveryText, Converter={StaticResource EmptyToCollapsed}}" />
             </StackPanel>
+            <DataTemplate.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsMouseOver, ElementName=Row}" Value="True" />
+                        <Condition Binding="{Binding HasActions}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="Toolbar" Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- "Alice renamed the group…" -->
+        <DataTemplate x:Key="SystemMessageTemplate" DataType="{x:Type m:ChatMessage}">
+            <TextBlock Margin="20,12,20,4" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="12"
+                       Foreground="{StaticResource SubtleTextBrush}" Text="{Binding Text}" />
         </DataTemplate>
 
         <c:MessageTemplateSelector x:Key="MessageSelector"
                                    Mine="{StaticResource MineMessageTemplate}"
-                                   Other="{StaticResource OtherMessageTemplate}" />
+                                   Other="{StaticResource OtherMessageTemplate}"
+                                   System="{StaticResource SystemMessageTemplate}" />
 
         <Style x:Key="ComposerBorder" TargetType="Border">
             <Setter Property="Background" Value="White" />
@@ -140,11 +303,23 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Star: hollow, or filled gold for favorites -->
+        <Style x:Key="FavoriteGlyph" TargetType="TextBlock">
+            <Setter Property="Text" Value="&#xE734;" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                    <Setter Property="Text" Value="&#xE735;" />
+                    <Setter Property="Foreground" Value="#E3A100" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
         <Grid x:Name="ChatRoot" Visibility="Collapsed">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
@@ -153,6 +328,15 @@
             <!-- Header -->
             <Border x:Name="Header" Padding="20,10" Background="White" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1">
                 <DockPanel>
+                    <c:RippleBlockButton DockPanel.Dock="Right" Margin="8,0,0,0" VerticalAlignment="Center" Conversation="{Binding}" />
+                    <Button DockPanel.Dock="Right" Margin="4,0,0,0" Style="{StaticResource IconButton}" Content="&#xE712;"
+                            ToolTip="More options" Click="OnChatMenu" />
+                    <Button DockPanel.Dock="Right" Margin="4,0,0,0" Style="{StaticResource IconButton}" Content="&#xE721;"
+                            ToolTip="Search in this chat (Ctrl+F)" Click="OnToggleSearch" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" ToolTip="Favorite (pins the chat to the top)"
+                            Command="{x:Static v:ChatActions.ToggleFavoriteCommand}" CommandParameter="{Binding}">
+                        <TextBlock Style="{StaticResource FavoriteGlyph}" />
+                    </Button>
                     <c:Avatar Width="36" Height="36" Margin="0,0,12,0"
                               Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" Ring="{Binding AvatarRing}" IsGroup="{Binding IsGroup}"
                               ShowPresence="{Binding IsGroup, Converter={StaticResource InverseBool}}"
@@ -173,9 +357,29 @@
                 </DockPanel>
             </Border>
 
+            <!-- Find in chat -->
+            <Border x:Name="SearchBar" Grid.Row="1" Padding="12,6" Background="White" BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="0,0,0,1" Visibility="Collapsed">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Width="26" Height="26" FontSize="11" Style="{StaticResource IconButton}"
+                            Content="&#xE711;" ToolTip="Close search (Esc)" Click="OnCloseSearch" />
+                    <TextBlock x:Name="SearchCount" DockPanel.Dock="Right" Margin="8,0" VerticalAlignment="Center" FontSize="12"
+                               Foreground="{StaticResource SubtleTextBrush}" />
+                    <TextBlock VerticalAlignment="Center" FontSize="12" FontFamily="{StaticResource IconFont}"
+                               Foreground="{StaticResource SubtleTextBrush}" Text="&#xE721;" />
+                    <Grid Margin="8,0,0,0">
+                        <TextBox x:Name="FindBox" Style="{StaticResource BareTextBox}" FontSize="13"
+                                 TextChanged="OnFindChanged" PreviewKeyDown="OnFindKeyDown" />
+                        <TextBlock Margin="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" FontSize="13"
+                                   Foreground="#8A8A8A" Text="Find in this chat"
+                                   Visibility="{Binding Text, ElementName=FindBox, Converter={StaticResource EmptyToVisible}}" />
+                    </Grid>
+                </DockPanel>
+            </Border>
+
             <!-- Messages -->
-            <ItemsControl x:Name="MessageList" Grid.Row="1" Padding="20,4,20,12" Focusable="False"
-                          ItemsSource="{Binding Messages}" ItemTemplateSelector="{StaticResource MessageSelector}"
+            <ItemsControl x:Name="MessageList" Grid.Row="2" Padding="20,4,20,12" Focusable="False"
+                          ItemTemplateSelector="{StaticResource MessageSelector}"
                           VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel"
                           ScrollViewer.CanContentScroll="True">
                 <ItemsControl.Template>
@@ -193,15 +397,34 @@
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
             </ItemsControl>
+            <TextBlock x:Name="NoResults" Grid.Row="2" Margin="0,40,0,0" HorizontalAlignment="Center" VerticalAlignment="Top"
+                       FontSize="13" Foreground="{StaticResource SubtleTextBrush}" Text="No messages match your search."
+                       Visibility="Collapsed" />
 
             <!-- Composer -->
-            <Border x:Name="Composer" Grid.Row="2" Margin="20,4,20,16" Style="{StaticResource ComposerBorder}">
+            <Border x:Name="Composer" Grid.Row="3" Margin="20,4,20,16" Style="{StaticResource ComposerBorder}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <Grid Margin="10,8,10,0">
+
+                    <!-- "Replying to …" / "Editing message" -->
+                    <Border x:Name="ComposerBanner" Margin="10,8,10,0" Padding="8,4" Background="{StaticResource PaneBrush}"
+                            BorderBrush="{StaticResource AccentBrush}" BorderThickness="3,0,0,0" CornerRadius="2" Visibility="Collapsed">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Width="24" Height="24" FontSize="10" Style="{StaticResource IconButton}"
+                                    Content="&#xE711;" ToolTip="Cancel (Esc)" Click="OnCancelComposerMode" />
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="BannerTitle" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                                <TextBlock x:Name="BannerText" FontSize="12" FontFamily="{StaticResource TextFont}"
+                                           Foreground="{StaticResource SubtleTextBrush}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="10,8,10,0">
                         <TextBox x:Name="Input" Style="{StaticResource BareTextBox}" AcceptsReturn="True" TextWrapping="Wrap"
                                  MaxLength="20000" MinHeight="22" MaxHeight="140" VerticalScrollBarVisibility="Auto"
                                  PreviewKeyDown="OnInputPreviewKeyDown" />
@@ -209,10 +432,10 @@
                                    Foreground="#8A8A8A" Text="Type a message"
                                    Visibility="{Binding Text, ElementName=Input, Converter={StaticResource EmptyToVisible}}" />
                     </Grid>
-                    <DockPanel Grid.Row="1" Margin="6,2,6,4">
+                    <DockPanel Grid.Row="2" Margin="6,2,6,4">
                         <ToggleButton x:Name="EmojiToggle" Style="{StaticResource IconToggleButton}" Content="&#xE76E;" ToolTip="Emoji" />
-                        <Button Style="{StaticResource IconButton}" Content="&#xE723;" ToolTip="Attach files or images" Click="OnAttach" />
-                        <Button DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource IconButton}"
+                        <Button x:Name="AttachButton" Style="{StaticResource IconButton}" Content="&#xE723;" ToolTip="Attach files or images" Click="OnAttach" />
+                        <Button x:Name="SendButton" DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource IconButton}"
                                 Foreground="{StaticResource AccentBrush}" Content="&#xE724;" ToolTip="Send (Enter)" Click="OnSend" />
                         <TextBlock x:Name="ComposerHint" Margin="8,0" VerticalAlignment="Center" FontSize="11"
                                    Foreground="#8A8A8A" Text="Enter to send · Shift+Enter for a new line · drop or paste files" />
