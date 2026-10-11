@@ -1,0 +1,88 @@
+<Window x:Class="MiniLocalChat.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:MiniLocalChat.Controls"
+        Title="Mini Local Chat" Width="1100" Height="720" MinWidth="760" MinHeight="480"
+        WindowStartupLocation="CenterScreen" FontFamily="Segoe UI"
+        Background="{StaticResource ChatBackgroundBrush}">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="68" />
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- App rail -->
+        <Border Background="{StaticResource RailBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,1,0">
+            <DockPanel LastChildFill="False">
+                <c:Avatar DockPanel.Dock="Top" Width="36" Height="36" Margin="0,14,0,12" ShowPresence="True" IsOnline="True"
+                          Text="{Binding Me.Initials}" Fill="{Binding Me.AvatarBrush}">
+                    <c:Avatar.ToolTip>
+                        <TextBlock>
+                            <Run Text="{Binding Me.DisplayName, Mode=OneWay}" FontWeight="SemiBold" />
+                            <LineBreak />
+                            <Run Text="{Binding Me.Ip, Mode=OneWay}" />
+                        </TextBlock>
+                    </c:Avatar.ToolTip>
+                </c:Avatar>
+                <Button DockPanel.Dock="Top" Style="{StaticResource RailButton}" Tag="Active">
+                    <StackPanel>
+                        <TextBlock HorizontalAlignment="Center" FontSize="20" FontFamily="{StaticResource IconFont}" Text="&#xE8BD;" />
+                        <TextBlock Margin="0,3,0,0" HorizontalAlignment="Center" FontSize="10" Text="Chat" />
+                    </StackPanel>
+                </Button>
+                <Button DockPanel.Dock="Bottom" Margin="0,0,0,8" Style="{StaticResource RailButton}" Click="OnSettings">
+                    <StackPanel>
+                        <TextBlock HorizontalAlignment="Center" FontSize="20" FontFamily="{StaticResource IconFont}" Text="&#xE713;" />
+                        <TextBlock Margin="0,3,0,0" HorizontalAlignment="Center" FontSize="10" Text="Settings" />
+                    </StackPanel>
+                </Button>
+            </DockPanel>
+        </Border>
+
+        <!-- Chat list -->
+        <Border Grid.Column="1" Background="{StaticResource PaneBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,1,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Margin="18,14,12,8">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE70F;"
+                            ToolTip="New chat (Ctrl+N)" Click="OnNewChat" />
+                    <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextBrush}" Text="Chat" />
+                </DockPanel>
+
+                <Border Grid.Row="1" Height="32" Margin="14,0,14,8" Background="White" CornerRadius="4"
+                        BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+                    <DockPanel Margin="8,0">
+                        <TextBlock VerticalAlignment="Center" FontSize="12" FontFamily="{StaticResource IconFont}"
+                                   Foreground="{StaticResource SubtleTextBrush}" Text="&#xE721;" />
+                        <Grid Margin="6,0,0,0">
+                            <TextBox x:Name="SearchBox" Style="{StaticResource BareTextBox}" FontSize="13" TextChanged="OnSearchChanged" />
+                            <TextBlock Margin="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" FontSize="13"
+                                       Foreground="#8A8A8A" Text="Search chats"
+                                       Visibility="{Binding Text, ElementName=SearchBox, Converter={StaticResource EmptyToVisible}}" />
+                        </Grid>
+                    </DockPanel>
+                </Border>
+
+                <ListBox x:Name="ConversationList" Grid.Row="2" Background="Transparent" BorderThickness="0"
+                         ItemTemplate="{StaticResource ConversationItemTemplate}"
+                         ItemContainerStyle="{StaticResource ConversationItemStyle}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         SelectionChanged="OnSelectionChanged" />
+
+                <TextBlock Grid.Row="2" Margin="24,30" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                           FontSize="13" Foreground="{StaticResource SubtleTextBrush}"
+                           Text="No chats yet. People on the network appear automatically — click ✎ to start a chat."
+                           Visibility="{Binding Conversations.Count, Converter={StaticResource ZeroToVisibility}}" />
+            </Grid>
+        </Border>
+
+        <!-- Conversation -->
+        <c:ChatView x:Name="ChatPane" Grid.Column="2" />
+    </Grid>
+</Window>

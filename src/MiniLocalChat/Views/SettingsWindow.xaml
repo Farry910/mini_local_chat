@@ -1,0 +1,46 @@
+<Window x:Class="MiniLocalChat.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Width="460" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" FontFamily="Segoe UI" Background="White">
+    <StackPanel Margin="24,20,24,20">
+        <TextBlock x:Name="Heading" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextBrush}" Text="Settings" />
+        <TextBlock x:Name="Intro" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource SubtleTextBrush}"
+                   Visibility="Collapsed"
+                   Text="Welcome! Choose the nickname everyone on the network will see. Your IP address is your identity, so this nickname always belongs to this computer." />
+
+        <TextBlock Style="{StaticResource FieldLabel}" Text="Your nickname" />
+        <TextBox x:Name="NicknameBox" Style="{StaticResource FieldTextBox}" />
+        <TextBlock x:Name="NicknameError" Margin="0,4,0,0" FontSize="12" Foreground="#C4314B" Visibility="Collapsed"
+                   Text="Please enter a nickname." />
+
+        <TextBlock Style="{StaticResource FieldLabel}" Text="Your IP address (your identity)" />
+        <ComboBox x:Name="IpCombo" FontSize="13" Padding="6,5" />
+        <TextBlock x:Name="IpNote" Margin="0,4,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
+                   Text="Only change this if your computer has several network adapters." />
+
+        <StackPanel x:Name="MoreSettings">
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Floating LED (shown while the app is in the tray)" />
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="LedLeft" Margin="0,0,20,0" VerticalContentAlignment="Center" FontSize="13" Content="Left side of the screen" />
+                <RadioButton x:Name="LedRight" VerticalContentAlignment="Center" FontSize="13" Content="Right side" />
+            </StackPanel>
+            <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
+                       Text="You can also drag the LED up or down, or over to the other side." />
+
+            <CheckBox x:Name="AutoStartBox" Margin="0,16,0,0" VerticalContentAlignment="Center" FontSize="13"
+                      Content="Start Mini Local Chat when I sign in to Windows" />
+
+            <TextBlock Margin="0,16,0,0" FontSize="12" Foreground="{StaticResource SubtleTextBrush}">
+                <Run Text="Chats and received files are stored in " />
+                <Hyperlink Click="OnOpenDataFolder" Foreground="{StaticResource AccentBrush}">your data folder</Hyperlink>
+                <Run Text="." />
+            </TextBlock>
+        </StackPanel>
+
+        <StackPanel Margin="0,22,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+            <Button x:Name="CancelButton" Style="{StaticResource SecondaryButton}" Content="Cancel" IsCancel="True" />
+            <Button x:Name="SaveButton" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" Content="Save" IsDefault="True" Click="OnSave" />
+        </StackPanel>
+    </StackPanel>
+</Window>
