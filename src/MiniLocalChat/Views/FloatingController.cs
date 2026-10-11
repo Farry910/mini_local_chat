@@ -128,7 +128,7 @@ public sealed class FloatingController
     // Beside the LED, toward the middle of the screen, kept inside the work area.
     private void PositionMini()
     {
-        const double overlap = 6;
+        const double overlap = 4;
         var area = _led.WorkArea;
         _mini.Left = _led.Side == LedSide.Left
             ? _led.Left + _led.Width - overlap

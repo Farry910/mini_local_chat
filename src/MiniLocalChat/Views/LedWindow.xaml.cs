@@ -146,7 +146,7 @@ public partial class LedWindow : Window
             Body.Fill = OnBody;
             Body.Stroke = OnStroke;
             CountText.Text = count > 99 ? "99+" : count.ToString();
-            CountText.FontSize = count > 99 ? 9 : count > 9 ? 11 : 13;
+            CountText.FontSize = count > 99 ? 6.5 : count > 9 ? 8.5 : 10.5;
             CountText.Visibility = Visibility.Visible;
             ToolTip = null;
             if (!wasOn)
