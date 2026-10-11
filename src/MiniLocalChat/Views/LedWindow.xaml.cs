@@ -29,6 +29,7 @@ public partial class LedWindow : Window
     // See-through at rest so it doesn't cover what's underneath; fully opaque while hovered.
     private const double IdleOpacityOff = 0.35;
     private const double IdleOpacityOn = 0.75;
+    private const int PulseCount = 3;
 
     private static readonly Brush OffBody = Radial(("#A3A9B3", 0), ("#5F6670", 0.55), ("#3A3F46", 1));
     private static readonly Brush OffStroke = Solid("#2A2E33");
@@ -153,14 +154,9 @@ public partial class LedWindow : Window
             CountText.FontSize = count > 99 ? 4.5 : count > 9 ? 6.5 : 8;
             CountText.Visibility = Visibility.Visible;
             ToolTip = null;
-            if (!wasOn)
+            if (!wasOn || grew)
             {
-                Glow.BeginAnimation(OpacityProperty, new DoubleAnimation(0.45, 1.0, TimeSpan.FromSeconds(1.1))
-                {
-                    AutoReverse = true,
-                    RepeatBehavior = RepeatBehavior.Forever,
-                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
-                });
+                Pulse();
             }
 
             if (grew)
@@ -187,6 +183,24 @@ public partial class LedWindow : Window
     }
 
     private void OnHoverChanged(object sender, MouseEventArgs e) => UpdateOpacity();
+
+    /// <summary>
+    /// Pulses the glow a few times when something new arrives, then holds a steady glow. A pulse that
+    /// never stops kept WPF redrawing ~60 times a second for as long as anything was unread (~10% of a CPU core).
+    /// </summary>
+    private void Pulse()
+    {
+        var pulse = new DoubleAnimation(0.45, 1.0, TimeSpan.FromSeconds(1.1))
+        {
+            AutoReverse = true,
+            RepeatBehavior = new RepeatBehavior(PulseCount),
+            FillBehavior = FillBehavior.Stop,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
+        };
+        Timeline.SetDesiredFrameRate(pulse, 30);
+        Glow.Opacity = 1.0;
+        Glow.BeginAnimation(OpacityProperty, pulse);
+    }
 
     private void Bump()
     {

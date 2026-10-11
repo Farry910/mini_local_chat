@@ -85,6 +85,107 @@ internal static class Win32
         var hwnd = new WindowInteropHelper(window).Handle;
         SetWindowLong(hwnd, GwlExStyle, GetWindowLong(hwnd, GwlExStyle) | WsExTransparent | WsExToolWindow | WsExNoActivate);
     }
+
+    /// <summary>
+    /// Per-pixel transparent overlay without WPF's AllowsTransparency. WPF then renders straight to the GPU and
+    /// Windows' compositor blends it, instead of WPF copying the whole frame back to the CPU every frame.
+    /// No border or rounded corners. Call once the window has a handle (SourceInitialized).
+    /// </summary>
+    public static void MakeCompositedOverlay(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (HwndSource.FromHwnd(hwnd)?.CompositionTarget is { } target)
+        {
+            target.BackgroundColor = System.Windows.Media.Colors.Transparent;
+        }
+
+        var margins = new Margins { Left = -1, Right = -1, Top = -1, Bottom = -1 };
+        DwmExtendFrameIntoClientArea(hwnd, ref margins);
+        var doNotRound = DwmCornerDoNotRound;
+        DwmSetWindowAttribute(hwnd, DwmaWindowCornerPreference, ref doNotRound, sizeof(int));
+        var noBorder = DwmColorNone;
+        DwmSetWindowAttribute(hwnd, DwmaBorderColor, ref noBorder, sizeof(int));
+    }
+
+    /// <summary>
+    /// Click-through for a <see cref="MakeCompositedOverlay"/> window: needs WS_EX_LAYERED with WS_EX_TRANSPARENT.
+    /// WPF strips WS_EX_LAYERED from windows without AllowsTransparency, so a message hook keeps the flags in
+    /// place whenever the style changes. Constant full opacity keeps GPU rendering.
+    /// </summary>
+    public static void MakeClickThroughOverlay(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        HwndSource.FromHwnd(hwnd)?.AddHook(KeepOverlayStyle);
+        SetWindowLong(hwnd, GwlExStyle, GetWindowLong(hwnd, GwlExStyle) | OverlayExStyle);
+        SetLayeredWindowAttributes(hwnd, 0, 255, LwaAlpha);
+    }
+
+    private const int OverlayExStyle = WsExLayered | WsExTransparent | WsExToolWindow | WsExNoActivate;
+    private const int WmStyleChanging = 0x007C;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct StyleStruct
+    {
+        public int StyleOld;
+        public int StyleNew;
+    }
+
+    private static IntPtr KeepOverlayStyle(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WmStyleChanging && wParam.ToInt32() == GwlExStyle)
+        {
+            var styles = Marshal.PtrToStructure<StyleStruct>(lParam);
+            styles.StyleNew |= OverlayExStyle;
+            Marshal.StructureToPtr(styles, lParam, false);
+            handled = true;
+        }
+
+        return IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// True while the user shouldn't be interrupted: a full-screen app or game, presentation mode,
+    /// or the screen is locked / screensaver.
+    /// </summary>
+    public static bool IsUserBusy()
+    {
+        if (SHQueryUserNotificationState(out var state) != 0)
+        {
+            return false;
+        }
+
+        // 1 not present (locked), 2 busy (full screen), 3 Direct3D full screen, 4 presentation mode, 7 full-screen store app.
+        return state is 1 or 2 or 3 or 4 or 7;
+    }
+
+    [DllImport("shell32.dll")]
+    private static extern int SHQueryUserNotificationState(out int state);
+
+    private const int WsExLayered = 0x80000;
+    private const uint LwaAlpha = 0x2;
+    private const int DwmaWindowCornerPreference = 33;
+    private const int DwmaBorderColor = 34;
+    private const int DwmCornerDoNotRound = 1;
+    private const int DwmColorNone = unchecked((int)0xFFFFFFFE);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Margins
+    {
+        public int Left;
+        public int Right;
+        public int Top;
+        public int Bottom;
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref Margins margins);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint colorKey, byte alpha, uint flags);
 }
 
 /// <summary>Tracks modal dialogs so the floating panel doesn't auto-hide while one is open.</summary>

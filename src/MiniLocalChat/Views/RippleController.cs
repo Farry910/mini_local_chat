@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using MiniLocalChat.Infrastructure;
 using MiniLocalChat.Models;
 using MiniLocalChat.Services;
 using Screen = System.Windows.Forms.Screen;
@@ -17,6 +18,7 @@ public sealed class RippleController
 
     private readonly ChatService _chat;
     private readonly Func<Point> _origin;
+    private readonly List<RippleWindow> _windows = [];
     private DateTime _lastPlayedUtc = DateTime.MinValue;
 
     /// <param name="origin">Where the waves start, in screen DIPs (the LED, or the screen center).</param>
@@ -34,13 +36,32 @@ public sealed class RippleController
         var first = AvatarPalette.ToColor(color1);
         var second = AvatarPalette.ToColor(color2);
         var origin = _origin();
-        var dpi = VisualTreeHelper.GetDpi(new DrawingVisual());
-        foreach (var screen in Screen.AllScreens)
+        foreach (var window in OverlayWindows())
         {
-            var b = screen.Bounds;
-            var bounds = new Rect(b.Left / dpi.DpiScaleX, b.Top / dpi.DpiScaleY, b.Width / dpi.DpiScaleX, b.Height / dpi.DpiScaleY);
-            new RippleWindow(bounds).Play(new Point(origin.X - bounds.Left, origin.Y - bounds.Top), first, second);
+            window.Play(new Point(origin.X - window.Bounds.Left, origin.Y - window.Bounds.Top), first, second);
         }
+    }
+
+    /// <summary>One overlay per monitor, kept between ripples; rebuilt only when the monitor layout changes.</summary>
+    private List<RippleWindow> OverlayWindows()
+    {
+        var dpi = VisualTreeHelper.GetDpi(new DrawingVisual());
+        var bounds = Screen.AllScreens
+            .Select(s => new Rect(s.Bounds.Left / dpi.DpiScaleX, s.Bounds.Top / dpi.DpiScaleY, s.Bounds.Width / dpi.DpiScaleX, s.Bounds.Height / dpi.DpiScaleY))
+            .ToList();
+
+        if (!bounds.SequenceEqual(_windows.Select(w => w.Bounds)))
+        {
+            foreach (var old in _windows)
+            {
+                old.Close();
+            }
+
+            _windows.Clear();
+            _windows.AddRange(bounds.Select(b => new RippleWindow(b)));
+        }
+
+        return _windows;
     }
 
     private void OnMessageReceived(Conversation conversation, ChatMessage message)
@@ -49,6 +70,13 @@ public sealed class RippleController
 
         // Already read (the chat is open on screen) or switched off.
         if (!settings.RippleEnabled || conversation.UnreadCount == 0 || message.Sender is not { } sender)
+        {
+            return;
+        }
+
+        // Don't sweep across a full-screen game or video, a presentation, or a locked screen,
+        // and respect Windows' "Animation effects" being turned off. The LED still lights up.
+        if (Win32.IsUserBusy() || !SystemParameters.ClientAreaAnimation)
         {
             return;
         }
