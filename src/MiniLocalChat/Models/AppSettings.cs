@@ -4,6 +4,11 @@ public sealed class AppSettings
 {
     public string Nickname { get; set; } = "";
 
+    /// <summary>My avatar fill and ring, also my ripple colors on other screens. Null = default from my IP.</summary>
+    public string? AvatarColor1 { get; set; }
+
+    public string? AvatarColor2 { get; set; }
+
     /// <summary>The IP that identifies me to others. Null means detect automatically.</summary>
     public string? MyIp { get; set; }
 
@@ -22,9 +27,10 @@ public sealed class AppSettings
 
     public bool StartWithWindows { get; set; }
 
-    /// <summary>Ripple across the whole screen when a message arrives, repeated while it's unread.</summary>
+    /// <summary>Ripple across the whole screen, in the sender's colors, when a message arrives.</summary>
     public bool RippleEnabled { get; set; } = true;
 
+    /// <summary>Quiet period after a ripple: messages within it don't ripple again. 0 = every message.</summary>
     public int RippleIntervalSeconds { get; set; } = 30;
 
     public bool TrayHintShown { get; set; }

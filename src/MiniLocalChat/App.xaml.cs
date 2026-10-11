@@ -32,6 +32,9 @@ public partial class App : Application
 
     public static new App Current => (App)Application.Current;
 
+    /// <summary>Null until startup has finished (e.g. during the first-run welcome).</summary>
+    public RippleController? Ripples => _ripples;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -150,7 +153,6 @@ public partial class App : Application
         if (SettingsWindow.ShowFor(owner))
         {
             _floating?.ApplySettings();
-            _ripples?.ApplySettings();
         }
     }
 

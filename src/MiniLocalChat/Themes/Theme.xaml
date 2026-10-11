@@ -256,7 +256,7 @@
             </Grid.RowDefinitions>
 
             <c:Avatar Grid.RowSpan="2" Width="36" Height="36" Margin="0,0,10,0" VerticalAlignment="Center"
-                      Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" IsGroup="{Binding IsGroup}"
+                      Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" Ring="{Binding AvatarRing}" IsGroup="{Binding IsGroup}"
                       ShowPresence="{Binding IsGroup, Converter={StaticResource InverseBool}}"
                       IsOnline="{Binding Peer.IsOnline, FallbackValue=False}" />
 

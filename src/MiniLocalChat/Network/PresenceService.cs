@@ -17,7 +17,7 @@ public sealed class PresenceService : IDisposable
 
     private readonly IPAddress? _bind;
     private readonly int _port;
-    private readonly Func<string> _nickname;
+    private readonly Func<PresencePacket> _describeSelf;
     private readonly Func<IReadOnlyCollection<string>> _knownIps;
     private readonly Action<string, PresencePacket> _onPacket;
     private readonly CancellationTokenSource _cts = new();
@@ -25,11 +25,12 @@ public sealed class PresenceService : IDisposable
     private Timer? _timer;
     private int _ticks;
 
-    public PresenceService(IPAddress? bind, int port, Func<string> nickname, Func<IReadOnlyCollection<string>> knownIps, Action<string, PresencePacket> onPacket)
+    /// <param name="describeSelf">My current nickname and colors; called from a timer thread.</param>
+    public PresenceService(IPAddress? bind, int port, Func<PresencePacket> describeSelf, Func<IReadOnlyCollection<string>> knownIps, Action<string, PresencePacket> onPacket)
     {
         _bind = bind;
         _port = port;
-        _nickname = nickname;
+        _describeSelf = describeSelf;
         _knownIps = knownIps;
         _onPacket = onPacket;
     }
@@ -88,8 +89,12 @@ public sealed class PresenceService : IDisposable
         Announce(PresenceKinds.Here, sweepSubnet: _ticks % SweepEveryTicks == 0);
     }
 
-    private byte[] Serialize(string kind) =>
-        JsonSerializer.SerializeToUtf8Bytes(new PresencePacket { Kind = kind, Nick = _nickname() }, Wire.Json);
+    private byte[] Serialize(string kind)
+    {
+        var packet = _describeSelf();
+        packet.Kind = kind;
+        return JsonSerializer.SerializeToUtf8Bytes(packet, Wire.Json);
+    }
 
     private HashSet<IPAddress> Targets()
     {

@@ -67,7 +67,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <c:Avatar Width="32" Height="32" Margin="0,2,10,0" VerticalAlignment="Top"
-                          Text="{Binding Sender.Initials}" Fill="{Binding Sender.AvatarBrush}"
+                          Text="{Binding Sender.Initials}" Fill="{Binding Sender.AvatarBrush}" Ring="{Binding Sender.RingBrush}"
                           Visibility="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=c:ChatView}, Converter={StaticResource InverseBoolToVisibility}}" />
                 <StackPanel Grid.Column="1">
                     <StackPanel Margin="0,0,0,3" Orientation="Horizontal">
@@ -154,7 +154,7 @@
             <Border x:Name="Header" Padding="20,10" Background="White" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1">
                 <DockPanel>
                     <c:Avatar Width="36" Height="36" Margin="0,0,12,0"
-                              Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" IsGroup="{Binding IsGroup}"
+                              Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" Ring="{Binding AvatarRing}" IsGroup="{Binding IsGroup}"
                               ShowPresence="{Binding IsGroup, Converter={StaticResource InverseBool}}"
                               IsOnline="{Binding Peer.IsOnline, FallbackValue=False}" />
                     <StackPanel VerticalAlignment="Center">

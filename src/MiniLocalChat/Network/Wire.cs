@@ -47,6 +47,9 @@ public sealed class WireHeader
     /// <summary>Sender's current nickname; lets the receiver keep names up to date.</summary>
     public string? Nick { get; set; }
 
+    /// <summary>Sender's two avatar colors ("#RRGGBB"), also used for the ripple on the receiver's screen.</summary>
+    public List<string>? Colors { get; set; }
+
     /// <summary>Set for group chats; shared by all members.</summary>
     public string? GroupId { get; set; }
 
@@ -86,4 +89,7 @@ public sealed class PresencePacket
     public string Kind { get; set; } = PresenceKinds.Here;
 
     public string? Nick { get; set; }
+
+    /// <summary>Two avatar colors ("#RRGGBB").</summary>
+    public List<string>? Colors { get; set; }
 }

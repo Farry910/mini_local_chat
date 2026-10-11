@@ -9,6 +9,7 @@ public partial class Avatar : UserControl
 {
     public static readonly DependencyProperty TextProperty = Register(nameof(Text), typeof(string), "");
     public static readonly DependencyProperty FillProperty = Register(nameof(Fill), typeof(Brush), null);
+    public static readonly DependencyProperty RingProperty = Register(nameof(Ring), typeof(Brush), null);
     public static readonly DependencyProperty IsGroupProperty = Register(nameof(IsGroup), typeof(bool), false);
     public static readonly DependencyProperty ShowPresenceProperty = Register(nameof(ShowPresence), typeof(bool), false);
     public static readonly DependencyProperty IsOnlineProperty = Register(nameof(IsOnline), typeof(bool), false);
@@ -33,6 +34,13 @@ public partial class Avatar : UserControl
     {
         get => (Brush?)GetValue(FillProperty);
         set => SetValue(FillProperty, value);
+    }
+
+    /// <summary>Second color, shown as a ring. Null = no ring.</summary>
+    public Brush? Ring
+    {
+        get => (Brush?)GetValue(RingProperty);
+        set => SetValue(RingProperty, value);
     }
 
     public bool IsGroup
@@ -67,6 +75,8 @@ public partial class Avatar : UserControl
     private void UpdateVisuals()
     {
         Circle.Fill = Fill ?? OfflineBrush;
+        RingCircle.Stroke = Ring;
+        RingCircle.Visibility = Ring is null ? Visibility.Collapsed : Visibility.Visible;
         InitialsText.Text = Text;
         InitialsText.Visibility = IsGroup ? Visibility.Collapsed : Visibility.Visible;
         GroupGlyph.Visibility = IsGroup ? Visibility.Visible : Visibility.Collapsed;
@@ -83,6 +93,7 @@ public partial class Avatar : UserControl
             return;
         }
 
+        RingCircle.StrokeThickness = Math.Max(2, size * 0.1);
         InitialsText.FontSize = Math.Max(8, size * 0.36);
         GroupGlyph.FontSize = Math.Max(8, size * 0.45);
         PresenceDot.Width = PresenceDot.Height = Math.Max(9, size * 0.32);

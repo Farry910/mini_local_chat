@@ -86,7 +86,11 @@ public sealed class Conversation : ObservableObject
     public string AvatarText => IsGroup ? "" : Peer?.Initials ?? "?";
 
     [JsonIgnore]
-    public Brush AvatarBrush => AvatarPalette.For(IsGroup ? Id : Peer?.Ip ?? Id);
+    public Brush AvatarBrush => !IsGroup && Peer is { } peer ? peer.AvatarBrush : AvatarPalette.ToBrush(AvatarPalette.DefaultColor1(Id));
+
+    /// <summary>The person's second color as a ring; groups have none.</summary>
+    [JsonIgnore]
+    public Brush? AvatarRing => IsGroup ? null : Peer?.RingBrush;
 
     [JsonIgnore]
     public string LastPreview
@@ -111,13 +115,15 @@ public sealed class Conversation : ObservableObject
         OnPropertyChanged(nameof(LastPreview));
     }
 
-    /// <summary>Call when a member's nickname or the member list changes.</summary>
+    /// <summary>Call when a member's nickname or colors, or the member list, change.</summary>
     public void RefreshDisplay()
     {
         OnPropertyChanged(nameof(Peer));
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Subtitle));
         OnPropertyChanged(nameof(AvatarText));
+        OnPropertyChanged(nameof(AvatarBrush));
+        OnPropertyChanged(nameof(AvatarRing));
         OnPropertyChanged(nameof(LastPreview));
     }
 }

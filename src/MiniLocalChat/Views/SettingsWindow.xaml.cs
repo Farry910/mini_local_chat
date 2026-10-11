@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using MiniLocalChat.Infrastructure;
+using MiniLocalChat.Models;
 using MiniLocalChat.Network;
 using MiniLocalChat.Services;
 
@@ -21,6 +22,14 @@ public partial class SettingsWindow : Window
         _welcome = welcome;
         NicknameBox.MaxLength = ChatService.MaxNicknameLength;
         NicknameBox.Text = _chat.Settings.Nickname;
+        NicknameBox.TextChanged += (_, _) => UpdateColorPreview();
+
+        Color1List.ItemsSource = AvatarPalette.Choices;
+        Color2List.ItemsSource = AvatarPalette.Choices;
+        Color1List.SelectedItem = _chat.Me.EffectiveColor1;
+        Color2List.SelectedItem = _chat.Me.EffectiveColor2;
+        PreviewRippleButton.Visibility = App.Current.Ripples is null ? Visibility.Collapsed : Visibility.Visible;
+        UpdateColorPreview();
 
         var detected = NetUtil.DetectPrimaryIPv4();
         IpCombo.Items.Add(new ComboBoxItem { Content = $"Automatic ({detected ?? "not found"})", Tag = null });
@@ -108,9 +117,31 @@ public partial class SettingsWindow : Window
             }
         }
 
-        _chat.ApplyProfile(nickname, (IpCombo.SelectedItem as ComboBoxItem)?.Tag as string);
+        _chat.ApplyProfile(nickname, (IpCombo.SelectedItem as ComboBoxItem)?.Tag as string, SelectedColor1, SelectedColor2);
         DialogResult = true;
     }
+
+    private string SelectedColor1 => Color1List.SelectedItem as string ?? _chat.Me.EffectiveColor1;
+
+    private string SelectedColor2 => Color2List.SelectedItem as string ?? _chat.Me.EffectiveColor2;
+
+    private void OnColorChanged(object sender, SelectionChangedEventArgs e) => UpdateColorPreview();
+
+    private void UpdateColorPreview()
+    {
+        if (!IsInitialized)
+        {
+            return;
+        }
+
+        ColorPreview.Fill = AvatarPalette.ToBrush(SelectedColor1);
+        ColorPreview.Ring = AvatarPalette.ToBrush(SelectedColor2);
+        var name = ChatService.CleanNickname(NicknameBox.Text);
+        ColorPreview.Text = AvatarPalette.Initials(name.Length > 0 ? name : "?");
+    }
+
+    private void OnPreviewRipple(object sender, RoutedEventArgs e) =>
+        App.Current.Ripples?.Play(SelectedColor1, SelectedColor2);
 
     private void OnAllowFirewall(object sender, RoutedEventArgs e)
     {

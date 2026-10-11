@@ -88,6 +88,8 @@ public sealed partial class ChatService : ObservableObject
         }
 
         Me.Nickname = Settings.Nickname;
+        Me.Color1 = Settings.AvatarColor1;
+        Me.Color2 = Settings.AvatarColor2;
 
         foreach (var contact in _storage.Load<List<Contact>>(ContactsFile) ?? [])
         {
@@ -124,7 +126,8 @@ public sealed partial class ChatService : ObservableObject
             packet => _ui.InvokeAsync(() => HandleIncoming(packet)).Task);
         _server.Start();
 
-        _presence = new PresenceService(BindAddress, Settings.UdpPort, () => Me.Nickname, () => _knownIps,
+        _presence = new PresenceService(BindAddress, Settings.UdpPort,
+            () => new PresencePacket { Nick = Me.Nickname, Colors = MyColors() }, () => _knownIps,
             (ip, packet) => _ui.InvokeAsync(() => HandlePresence(ip, packet)));
         _presence.Start();
 
@@ -168,13 +171,17 @@ public sealed partial class ChatService : ObservableObject
         return clean.Length > MaxNicknameLength ? clean[..MaxNicknameLength] : clean;
     }
 
-    public void ApplyProfile(string nickname, string? myIp)
+    public void ApplyProfile(string nickname, string? myIp, string? color1, string? color2)
     {
         Settings.Nickname = CleanNickname(nickname);
         Settings.MyIp = NetUtil.Normalize(myIp);
+        Settings.AvatarColor1 = AvatarPalette.NormalizeHex(color1);
+        Settings.AvatarColor2 = AvatarPalette.NormalizeHex(color2);
         SaveSettings();
 
         Me.Nickname = Settings.Nickname;
+        Me.Color1 = Settings.AvatarColor1;
+        Me.Color2 = Settings.AvatarColor2;
         if (BindAddress is null)
         {
             Me.Ip = ResolveMyIp(Settings.MyIp);
@@ -361,6 +368,7 @@ public sealed partial class ChatService : ObservableObject
         {
             Id = message.Id,
             Nick = Me.Nickname,
+            Colors = MyColors(),
             Kind = message.Kind,
             Text = message.Kind == MessageKind.Text ? message.Text : null,
             FileName = message.FileName,
@@ -405,6 +413,7 @@ public sealed partial class ChatService : ObservableObject
             sender.Nickname = nick;
         }
 
+        ApplyColors(sender, header.Colors);
         MarkSeen(sender);
 
         // Already have it: the sender missed our ACK and retried.
@@ -506,6 +515,7 @@ public sealed partial class ChatService : ObservableObject
             contact.Nickname = nick;
         }
 
+        ApplyColors(contact, packet.Colors);
         if (packet.Kind == PresenceKinds.Bye)
         {
             contact.IsOnline = false;
@@ -516,6 +526,20 @@ public sealed partial class ChatService : ObservableObject
         if (packet.Kind == PresenceKinds.Hello)
         {
             _presence?.SendTo(ip, PresenceKinds.Here);
+        }
+    }
+
+    private List<string> MyColors() => [Me.EffectiveColor1, Me.EffectiveColor2];
+
+    /// <summary>Takes the colors the person chose; anything malformed is ignored.</summary>
+    private static void ApplyColors(Contact contact, List<string>? colors)
+    {
+        if (colors is [var first, var second, ..]
+            && AvatarPalette.NormalizeHex(first) is { } color1
+            && AvatarPalette.NormalizeHex(second) is { } color2)
+        {
+            contact.Color1 = color1;
+            contact.Color2 = color2;
         }
     }
 
@@ -569,7 +593,8 @@ public sealed partial class ChatService : ObservableObject
 
     private void OnContactPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(Contact.Nickname) && sender is Contact contact)
+        if (e.PropertyName is nameof(Contact.Nickname) or nameof(Contact.Color1) or nameof(Contact.Color2)
+            && sender is Contact contact)
         {
             foreach (var conversation in Conversations.Where(c => c.Members.Contains(contact)))
             {
