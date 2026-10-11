@@ -16,6 +16,7 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         Icon = AppIcons.WindowIcon;
+        Title = $"Settings – {AppInfo.Title}";
         _welcome = welcome;
         NicknameBox.MaxLength = ChatService.MaxNicknameLength;
         NicknameBox.Text = _chat.Settings.Nickname;
@@ -41,7 +42,7 @@ public partial class SettingsWindow : Window
 
         if (welcome)
         {
-            Title = "Welcome to Mini Local Chat";
+            Title = $"Welcome to {AppInfo.Title}";
             Heading.Text = "Welcome 👋";
             Intro.Visibility = Visibility.Visible;
             MoreSettings.Visibility = Visibility.Collapsed;

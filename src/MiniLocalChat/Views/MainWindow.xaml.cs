@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Icon = AppIcons.WindowIcon;
+        Title = AppInfo.Title;
         DataContext = _chat;
 
         _conversations = new ListCollectionView(_chat.Conversations)

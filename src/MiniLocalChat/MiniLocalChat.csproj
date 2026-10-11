@@ -11,7 +11,8 @@
     <RootNamespace>MiniLocalChat</RootNamespace>
     <AssemblyName>MiniLocalChat</AssemblyName>
     <Product>Mini Local Chat</Product>
-    <Version>1.0.0</Version>
+    <!-- Shown in the title bar, together with the git commit the build came from. -->
+    <Version>1.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -41,9 +41,9 @@ public sealed class TrayIcon : IDisposable
         _icon.Icon = count > 0 ? _unread : _normal;
         _icon.Text = count switch
         {
-            0 => "Mini Local Chat",
-            1 => "Mini Local Chat – 1 new message",
-            _ => $"Mini Local Chat – {count} new messages",
+            0 => AppInfo.Title,
+            1 => $"{AppInfo.Title} – 1 new message",
+            _ => $"{AppInfo.Title} – {count} new messages",
         };
     }
 
