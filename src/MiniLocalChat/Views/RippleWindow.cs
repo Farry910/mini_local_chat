@@ -4,20 +4,24 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using MiniLocalChat.Infrastructure;
-using Path = System.Windows.Shapes.Path;
 
 namespace MiniLocalChat.Views;
 
 /// <summary>
-/// Transparent, click-through overlay covering one monitor. Plays green rings spreading out from
-/// a point (the LED) and closes itself when done.
+/// Transparent, click-through overlay covering one monitor. Plays a Material (MUI) style ripple:
+/// one translucent filled wave spreading out from a point (the LED), then fading. Closes itself when done.
 /// </summary>
 public sealed class RippleWindow : Window
 {
-    private const int RingCount = 3;
-    private static readonly TimeSpan RingDuration = TimeSpan.FromMilliseconds(1600);
-    private static readonly TimeSpan RingStagger = TimeSpan.FromMilliseconds(280);
-    private static readonly Color RingColor = Color.FromRgb(0x22, 0xC5, 0x5E);
+    private static readonly TimeSpan ExpandDuration = TimeSpan.FromMilliseconds(1000);
+    private static readonly TimeSpan FadeStart = TimeSpan.FromMilliseconds(550);
+    private static readonly TimeSpan FadeEnd = TimeSpan.FromMilliseconds(1300);
+
+    // MUI's ripple easing: cubic-bezier(0.4, 0, 0.2, 1).
+    private static readonly KeySpline MuiEasing = new(0.4, 0, 0.2, 1);
+
+    // Soft green fill, a little stronger toward the wave front, feathered at the very edge (no hard line).
+    private static readonly Brush WaveBrush = CreateWaveBrush();
 
     private readonly Canvas _canvas = new() { IsHitTestVisible = false };
 
@@ -40,43 +44,49 @@ public sealed class RippleWindow : Window
         SourceInitialized += (_, _) => Win32.MakeClickThrough(this);
     }
 
-    /// <param name="origin">Ring center, in this window's coordinates (may lie outside it, on another monitor).</param>
+    /// <param name="origin">Wave center, in this window's coordinates (may lie outside it, on another monitor).</param>
     public void Play(Point origin)
     {
         Show();
 
-        // Big enough to sweep past the farthest corner of this monitor.
-        var maxRadius = new[] { new Point(0, 0), new Point(Width, 0), new Point(0, Height), new Point(Width, Height) }
-            .Max(corner => (corner - origin).Length) + 40;
+        // Big enough to cover the farthest corner of this monitor.
+        var radius = new[] { new Point(0, 0), new Point(Width, 0), new Point(0, Height), new Point(Width, Height) }
+            .Max(corner => (corner - origin).Length) + 60;
 
-        var brush = new SolidColorBrush(RingColor);
-        brush.Freeze();
-        var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
-        ease.Freeze();
-
-        for (var i = 0; i < RingCount; i++)
+        var scale = new ScaleTransform(0, 0, radius, radius);
+        var wave = new Ellipse
         {
-            var begin = TimeSpan.FromTicks(RingStagger.Ticks * i);
-            var geometry = new EllipseGeometry(origin, 0, 0);
-            var ring = new Path { Data = geometry, Stroke = brush, Opacity = 0 };
-            _canvas.Children.Add(ring);
+            Width = radius * 2,
+            Height = radius * 2,
+            Fill = WaveBrush,
+            RenderTransform = scale,
+        };
+        Canvas.SetLeft(wave, origin.X - radius);
+        Canvas.SetTop(wave, origin.Y - radius);
+        _canvas.Children.Add(wave);
 
-            var radius = new DoubleAnimation(0, maxRadius, RingDuration) { BeginTime = begin, EasingFunction = ease };
-            geometry.BeginAnimation(EllipseGeometry.RadiusXProperty, radius);
-            geometry.BeginAnimation(EllipseGeometry.RadiusYProperty, radius);
+        var expand = new DoubleAnimationUsingKeyFrames();
+        expand.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        expand.KeyFrames.Add(new SplineDoubleKeyFrame(1, KeyTime.FromTimeSpan(ExpandDuration), MuiEasing));
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, expand);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, expand);
 
-            ring.BeginAnimation(Shape.StrokeThicknessProperty, new DoubleAnimation(22, 3, RingDuration) { BeginTime = begin });
+        var fade = new DoubleAnimationUsingKeyFrames();
+        fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(FadeStart)));
+        fade.KeyFrames.Add(new SplineDoubleKeyFrame(0, KeyTime.FromTimeSpan(FadeEnd), MuiEasing));
+        fade.Completed += (_, _) => Close();
+        wave.BeginAnimation(OpacityProperty, fade);
+    }
 
-            var fade = new DoubleAnimationUsingKeyFrames { BeginTime = begin };
-            fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-            fade.KeyFrames.Add(new LinearDoubleKeyFrame(0.75 - i * 0.15, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(120))));
-            fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(RingDuration)));
-            if (i == RingCount - 1)
-            {
-                fade.Completed += (_, _) => Close();
-            }
-
-            ring.BeginAnimation(OpacityProperty, fade);
-        }
+    private static Brush CreateWaveBrush()
+    {
+        var brush = new RadialGradientBrush();
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x24, 0x22, 0xC5, 0x5E), 0.0));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x38, 0x22, 0xC5, 0x5E), 0.75));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x5C, 0x22, 0xC5, 0x5E), 0.93));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x00, 0x22, 0xC5, 0x5E), 1.0));
+        brush.Freeze();
+        return brush;
     }
 }
