@@ -1,9 +1,10 @@
 <Window x:Class="MiniLocalChat.Views.LedWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Mini Local Chat LED" Width="30" Height="30"
+        Title="Mini Local Chat LED" Width="22" Height="22"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
         Topmost="True" ShowInTaskbar="False" ShowActivated="False"
+        MouseEnter="OnHoverChanged" MouseLeave="OnHoverChanged"
         MouseLeftButtonDown="OnMouseDown" MouseMove="OnMouseMove" MouseLeftButtonUp="OnMouseUp">
     <Window.ContextMenu>
         <ContextMenu>
@@ -13,37 +14,41 @@
         </ContextMenu>
     </Window.ContextMenu>
 
-    <!-- Nearly transparent fill so the whole 30×30 square catches the mouse, not just the bulb. -->
+    <!-- Nearly transparent fill so the whole 22×22 square catches the mouse, not just the bulb.
+         It stays outside the faded part: a pixel that ends up fully transparent would let clicks through. -->
     <Grid Background="#01000000" Cursor="Hand">
-        <Ellipse x:Name="Glow" Width="28" Height="28" Opacity="0" IsHitTestVisible="False">
-            <Ellipse.Fill>
-                <RadialGradientBrush>
-                    <GradientStop Offset="0.45" Color="#D04ADE80" />
-                    <GradientStop Offset="0.75" Color="#5022C55E" />
-                    <GradientStop Offset="1" Color="#0022C55E" />
-                </RadialGradientBrush>
-            </Ellipse.Fill>
-        </Ellipse>
-
-        <Grid x:Name="Bulb" Width="18" Height="18" RenderTransformOrigin="0.5,0.5">
-            <Grid.RenderTransform>
-                <ScaleTransform x:Name="BulbScale" />
-            </Grid.RenderTransform>
-            <Ellipse x:Name="Body" StrokeThickness="1" />
-            <Ellipse Width="8" Height="5" Margin="4,2.5,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False">
+        <!-- Semi-transparent at rest; opaque while hovered. -->
+        <Grid x:Name="Visual">
+            <Ellipse x:Name="Glow" Width="21" Height="21" Opacity="0" IsHitTestVisible="False">
                 <Ellipse.Fill>
                     <RadialGradientBrush>
-                        <GradientStop Offset="0" Color="#C0FFFFFF" />
-                        <GradientStop Offset="1" Color="#00FFFFFF" />
+                        <GradientStop Offset="0.45" Color="#D04ADE80" />
+                        <GradientStop Offset="0.75" Color="#5022C55E" />
+                        <GradientStop Offset="1" Color="#0022C55E" />
                     </RadialGradientBrush>
                 </Ellipse.Fill>
             </Ellipse>
-            <TextBlock x:Name="CountText" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontFamily="Segoe UI" FontWeight="Bold" Foreground="White" IsHitTestVisible="False">
-                <TextBlock.Effect>
-                    <DropShadowEffect BlurRadius="2" ShadowDepth="0" Opacity="0.9" Color="#14532D" />
-                </TextBlock.Effect>
-            </TextBlock>
+
+            <Grid x:Name="Bulb" Width="13" Height="13" RenderTransformOrigin="0.5,0.5">
+                <Grid.RenderTransform>
+                    <ScaleTransform x:Name="BulbScale" />
+                </Grid.RenderTransform>
+                <Ellipse x:Name="Body" StrokeThickness="0.75" />
+                <Ellipse Width="6" Height="3.5" Margin="3,1.75,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Offset="0" Color="#C0FFFFFF" />
+                            <GradientStop Offset="1" Color="#00FFFFFF" />
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <TextBlock x:Name="CountText" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           FontFamily="Segoe UI" FontWeight="Bold" Foreground="White" IsHitTestVisible="False">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="1.5" ShadowDepth="0" Opacity="0.9" Color="#14532D" />
+                    </TextBlock.Effect>
+                </TextBlock>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

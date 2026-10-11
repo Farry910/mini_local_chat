@@ -26,6 +26,10 @@ public partial class LedWindow : Window
     private const double EdgeMargin = 4;
     private const double DragThreshold = 5;
 
+    // See-through at rest so it doesn't cover what's underneath; fully opaque while hovered.
+    private const double IdleOpacityOff = 0.35;
+    private const double IdleOpacityOn = 0.75;
+
     private static readonly Brush OffBody = Radial(("#A3A9B3", 0), ("#5F6670", 0.55), ("#3A3F46", 1));
     private static readonly Brush OffStroke = Solid("#2A2E33");
     private static readonly Brush OnBody = Radial(("#EAFFE8", 0), ("#6EE787", 0.3), ("#22C55E", 0.65), ("#15803D", 1));
@@ -146,7 +150,7 @@ public partial class LedWindow : Window
             Body.Fill = OnBody;
             Body.Stroke = OnStroke;
             CountText.Text = count > 99 ? "99+" : count.ToString();
-            CountText.FontSize = count > 99 ? 6.5 : count > 9 ? 8.5 : 10.5;
+            CountText.FontSize = count > 99 ? 4.5 : count > 9 ? 6.5 : 8;
             CountText.Visibility = Visibility.Visible;
             ToolTip = null;
             if (!wasOn)
@@ -172,7 +176,17 @@ public partial class LedWindow : Window
             Glow.BeginAnimation(OpacityProperty, null);
             Glow.Opacity = 0;
         }
+
+        UpdateOpacity();
     }
+
+    private void UpdateOpacity()
+    {
+        var target = IsMouseOver ? 1.0 : _shownCount > 0 ? IdleOpacityOn : IdleOpacityOff;
+        Visual.BeginAnimation(OpacityProperty, new DoubleAnimation(target, TimeSpan.FromMilliseconds(150)));
+    }
+
+    private void OnHoverChanged(object sender, MouseEventArgs e) => UpdateOpacity();
 
     private void Bump()
     {

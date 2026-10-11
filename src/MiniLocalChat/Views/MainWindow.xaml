@@ -70,6 +70,7 @@
                 </Border>
 
                 <ListBox x:Name="ConversationList" Grid.Row="2" Background="Transparent" BorderThickness="0"
+                         IsSynchronizedWithCurrentItem="False"
                          ItemTemplate="{StaticResource ConversationItemTemplate}"
                          ItemContainerStyle="{StaticResource ConversationItemStyle}"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
