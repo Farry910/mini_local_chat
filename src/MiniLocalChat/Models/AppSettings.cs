@@ -30,8 +30,8 @@ public sealed class AppSettings
     /// <summary>Ripple across the whole screen, in the sender's colors, when a message arrives.</summary>
     public bool RippleEnabled { get; set; } = true;
 
-    /// <summary>Quiet period after a ripple: messages within it don't ripple again. 0 = every message.</summary>
-    public int RippleIntervalSeconds { get; set; } = 30;
+    /// <summary>Every message ripples, but at most once per this many seconds, so a burst gives a few ripples, not dozens.</summary>
+    public int RippleMinGapSeconds { get; set; } = 3;
 
     public bool TrayHintShown { get; set; }
 }

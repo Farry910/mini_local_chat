@@ -7,13 +7,13 @@ using Screen = System.Windows.Forms.Screen;
 namespace MiniLocalChat.Views;
 
 /// <summary>
-/// Full-screen ripple in the sender's two avatar colors when a message arrives. No repeats; after a
-/// ripple, further messages stay quiet for <see cref="AppSettings.RippleIntervalSeconds"/>.
+/// Full-screen ripple in the sender's two avatar colors whenever a message arrives, at most once
+/// every <see cref="AppSettings.RippleMinGapSeconds"/>. No repeat reminders.
 /// </summary>
 public sealed class RippleController
 {
-    public const int MinIntervalSeconds = 0;
-    public const int MaxIntervalSeconds = 3600;
+    public const int MinGapSeconds = 0;
+    public const int MaxGapSeconds = 60;
 
     private readonly ChatService _chat;
     private readonly Func<Point> _origin;
@@ -47,14 +47,15 @@ public sealed class RippleController
     {
         var settings = _chat.Settings;
 
-        // Already read (the chat is open on screen), switched off, or still in the quiet period.
+        // Already read (the chat is open on screen) or switched off.
         if (!settings.RippleEnabled || conversation.UnreadCount == 0 || message.Sender is not { } sender)
         {
             return;
         }
 
-        var quiet = TimeSpan.FromSeconds(Math.Clamp(settings.RippleIntervalSeconds, MinIntervalSeconds, MaxIntervalSeconds));
-        if (DateTime.UtcNow - _lastPlayedUtc < quiet)
+        // A burst of messages: only one ripple per gap.
+        var gap = TimeSpan.FromSeconds(Math.Clamp(settings.RippleMinGapSeconds, MinGapSeconds, MaxGapSeconds));
+        if (DateTime.UtcNow - _lastPlayedUtc < gap)
         {
             return;
         }

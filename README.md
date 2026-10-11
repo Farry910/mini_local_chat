@@ -11,7 +11,7 @@ A Teams-style private chat for computers on the same local network (e.g. a `192.
   - hover it: a mini panel lists only the chats with new messages, so you can read and reply without opening the app
   - drag it up/down or to the other side; double-click it to open the full app
 - **Personal colors.** Each user picks two colors in Settings: their avatar fill and its ring. Everyone else sees them on that person's avatar.
-- **Screen ripple.** When a message arrives, two Material-style waves in the sender's two colors spread across the whole screen from the LED. After a ripple, further messages stay quiet for 30 s (configurable in Settings; 0 = every message; or off). The overlay never blocks clicks or takes focus.
+- **Screen ripple.** When a message arrives, two Material-style waves in the sender's two colors spread across the whole screen from the LED. Every message ripples, at most once every 3 s so a burst of messages doesn't flood the screen (configurable in Settings, or off). The overlay never blocks clicks or takes focus.
 - **Exit** only from the tray icon menu (or the LED's right-click menu).
 
 ## Build & run

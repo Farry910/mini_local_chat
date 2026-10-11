@@ -50,7 +50,7 @@ public partial class SettingsWindow : Window
         LedRight.IsChecked = !LedLeft.IsChecked;
         AutoStartBox.IsChecked = _chat.Settings.StartWithWindows;
         RippleBox.IsChecked = _chat.Settings.RippleEnabled;
-        RippleIntervalBox.Text = _chat.Settings.RippleIntervalSeconds.ToString();
+        RippleGapBox.Text = _chat.Settings.RippleMinGapSeconds.ToString();
 
         if (welcome)
         {
@@ -97,17 +97,17 @@ public partial class SettingsWindow : Window
 
         if (!_welcome)
         {
-            if (!int.TryParse(RippleIntervalBox.Text.Trim(), out var interval)
-                || interval is < RippleController.MinIntervalSeconds or > RippleController.MaxIntervalSeconds)
+            if (!int.TryParse(RippleGapBox.Text.Trim(), out var gap)
+                || gap is < RippleController.MinGapSeconds or > RippleController.MaxGapSeconds)
             {
-                RippleError.Text = $"Enter a number of seconds from {RippleController.MinIntervalSeconds} to {RippleController.MaxIntervalSeconds}.";
+                RippleError.Text = $"Enter a number of seconds from {RippleController.MinGapSeconds} to {RippleController.MaxGapSeconds}.";
                 RippleError.Visibility = Visibility.Visible;
-                RippleIntervalBox.Focus();
+                RippleGapBox.Focus();
                 return;
             }
 
             _chat.Settings.RippleEnabled = RippleBox.IsChecked == true;
-            _chat.Settings.RippleIntervalSeconds = interval;
+            _chat.Settings.RippleMinGapSeconds = gap;
             _chat.Settings.LedSide = LedLeft.IsChecked == true ? nameof(LedSide.Left) : nameof(LedSide.Right);
             var autoStart = AutoStartBox.IsChecked == true;
             if (autoStart != _chat.Settings.StartWithWindows)

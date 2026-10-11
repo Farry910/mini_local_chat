@@ -102,10 +102,10 @@
                       Content="Ripple across the screen in the sender's colors" />
             <StackPanel Margin="22,8,0,0" Orientation="Horizontal"
                         IsEnabled="{Binding IsChecked, ElementName=RippleBox}">
-                <TextBlock VerticalAlignment="Center" FontSize="13" Text="Then stay quiet for" />
-                <TextBox x:Name="RippleIntervalBox" Width="56" Margin="8,0" Style="{StaticResource FieldTextBox}"
-                         HorizontalContentAlignment="Right" MaxLength="4" />
-                <TextBlock VerticalAlignment="Center" FontSize="13" Text="seconds (0 = every message)" />
+                <TextBlock VerticalAlignment="Center" FontSize="13" Text="At most once every" />
+                <TextBox x:Name="RippleGapBox" Width="48" Margin="8,0" Style="{StaticResource FieldTextBox}"
+                         HorizontalContentAlignment="Right" MaxLength="2" />
+                <TextBlock VerticalAlignment="Center" FontSize="13" Text="seconds" />
             </StackPanel>
             <TextBlock x:Name="RippleError" Margin="22,4,0,0" FontSize="12" Foreground="#C4314B" Visibility="Collapsed" />
 
