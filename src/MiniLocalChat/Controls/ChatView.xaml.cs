@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -50,6 +51,8 @@ public partial class ChatView : UserControl
     ];
 
     private readonly Dictionary<Conversation, string> _drafts = new();
+    private readonly Dictionary<Conversation, List<PendingAttachment>> _attachmentDrafts = new();
+    private readonly ObservableCollection<PendingAttachment> _attachments = [];
     private ListCollectionView? _messages;
     private ScrollViewer? _scroller;
     private ChatMessage? _replyTo;
@@ -65,6 +68,8 @@ public partial class ChatView : UserControl
         InitializeComponent();
         EmojiGrid.ItemsSource = Emojis;
         CommandManager.AddPreviewExecutedHandler(Input, OnInputPreviewExecuted);
+        CommandManager.AddPreviewCanExecuteHandler(Input, OnInputPreviewCanExecute);
+        AttachmentTray.ItemsSource = _attachments;
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Find, (_, _) => OpenSearch()));
 
         // GIFs only play while they can be seen: not in the tray, not minimized.
@@ -172,7 +177,19 @@ public partial class ChatView : UserControl
         {
             oldValue.Messages.CollectionChanged -= OnMessagesChanged;
             _drafts[oldValue] = _editing is null ? Input.Text : _draftBeforeEdit;
+            _attachmentDrafts[oldValue] = [.. _attachments];
         }
+
+        _attachments.Clear();
+        if (newValue is not null && _attachmentDrafts.Remove(newValue, out var waiting))
+        {
+            foreach (var attachment in waiting)
+            {
+                _attachments.Add(attachment);
+            }
+        }
+
+        UpdateAttachmentTray();
 
         _editing = null;
         _replyTo = null;
@@ -252,19 +269,40 @@ public partial class ChatView : UserControl
 
     private void Send()
     {
-        if (Conversation is not { } conversation || string.IsNullOrWhiteSpace(Input.Text))
+        if (Conversation is not { } conversation)
         {
             return;
         }
 
         if (_editing is { } editing)
         {
-            App.Chat.EditMessage(editing, Input.Text);
-            EndComposerMode();
+            if (!string.IsNullOrWhiteSpace(Input.Text))
+            {
+                App.Chat.EditMessage(editing, Input.Text);
+                EndComposerMode();
+            }
+
             return;
         }
 
-        App.Chat.SendText(conversation, Input.Text, _replyTo);
+        if (string.IsNullOrWhiteSpace(Input.Text) && _attachments.Count == 0)
+        {
+            return;
+        }
+
+        // Pictures and files first, then the text (which carries the reply, if any).
+        foreach (var attachment in _attachments.Where(a => File.Exists(a.Path)))
+        {
+            App.Chat.SendFile(conversation, attachment.Path);
+        }
+
+        _attachments.Clear();
+        UpdateAttachmentTray();
+        if (!string.IsNullOrWhiteSpace(Input.Text))
+        {
+            App.Chat.SendText(conversation, Input.Text, _replyTo);
+        }
+
         Input.Clear();
         _drafts.Remove(conversation);
         _replyTo = null;
@@ -337,17 +375,84 @@ public partial class ChatView : UserControl
         FocusInput();
     }
 
-    private void SendFiles(IEnumerable<string> paths)
+    /// <summary>Adds files to the tray above the input; they're sent with the next message (Teams-style).</summary>
+    private void AddAttachments(IEnumerable<string> paths)
     {
-        if (Conversation is not { } conversation)
+        if (Conversation is null || _editing is not null)
         {
             return;
         }
 
         foreach (var path in paths.Where(File.Exists))
         {
-            App.Chat.SendFile(conversation, path);
+            if (!_attachments.Any(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase)))
+            {
+                _attachments.Add(new PendingAttachment(path));
+            }
         }
+
+        UpdateAttachmentTray();
+        FocusInput();
+    }
+
+    private void UpdateAttachmentTray()
+    {
+        AttachmentTray.Visibility = _attachments.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        SendButton.IsEnabled = true;
+    }
+
+    private void OnRemoveAttachment(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PendingAttachment attachment })
+        {
+            _attachments.Remove(attachment);
+            UpdateAttachmentTray();
+            FocusInput();
+        }
+    }
+
+    /// <summary>
+    /// Ctrl+V / Shift+Insert / Paste with a screenshot or copied files on the clipboard: attach them.
+    /// Handled here because a TextBox won't even run Paste when the clipboard has no text.
+    /// Returns true if it attached something (so the normal text paste must not run).
+    /// </summary>
+    private bool PasteAttachments()
+    {
+        if (Conversation is null || _editing is not null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var data = Clipboard.GetDataObject();
+            if (data is null)
+            {
+                return false;
+            }
+
+            if (data.GetDataPresent(DataFormats.FileDrop) && data.GetData(DataFormats.FileDrop) is string[] files)
+            {
+                AddAttachments(files);
+                return true;
+            }
+
+            if (ClipboardImage.HasPicture(data) && ClipboardImage.ReadPng(data) is { } png)
+            {
+                var dir = Path.Combine(AppPaths.FilesDir, "pasted");
+                Directory.CreateDirectory(dir);
+                var path = Path.Combine(dir, $"Screenshot_{DateTime.Now:yyyy-MM-dd_HH-mm-ss_fff}.png");
+                File.WriteAllBytes(path, png);
+                AddAttachments([path]);
+                return true;
+            }
+        }
+        catch (Exception ex) when (ex is ExternalException or IOException or UnauthorizedAccessException)
+        {
+            Log.Error("Paste", ex);
+        }
+
+        return false;
     }
 
     private void OnSend(object sender, RoutedEventArgs e)
@@ -368,51 +473,60 @@ public partial class ChatView : UserControl
             e.Handled = true;
             EndComposerMode();
         }
+        else if (IsPasteGesture(e) && PasteAttachments())
+        {
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Back && Input.Text.Length == 0 && _attachments.Count > 0)
+        {
+            // Backspace in an empty box removes the last attachment.
+            e.Handled = true;
+            _attachments.RemoveAt(_attachments.Count - 1);
+            UpdateAttachmentTray();
+        }
     }
 
-    // Pasting an image or copied files sends them instead of inserting text.
+    private static bool IsPasteGesture(KeyEventArgs e) =>
+        (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control)
+        || (e.Key == Key.Insert && Keyboard.Modifiers == ModifierKeys.Shift);
+
+    // Right-click → Paste: allow it when the clipboard holds a picture or files (the TextBox alone wouldn't).
+    private void OnInputPreviewCanExecute(object sender, CanExecuteRoutedEventArgs e)
+    {
+        if (e.Command == ApplicationCommands.Paste && Conversation is not null && _editing is null && ClipboardHasAttachment())
+        {
+            e.CanExecute = true;
+            e.Handled = true;
+        }
+    }
+
     private void OnInputPreviewExecuted(object sender, ExecutedRoutedEventArgs e)
     {
-        if (e.Command != ApplicationCommands.Paste || Conversation is null || _editing is not null)
+        if (e.Command == ApplicationCommands.Paste && PasteAttachments())
         {
-            return;
+            e.Handled = true;
         }
+    }
 
+    private static bool ClipboardHasAttachment()
+    {
         try
         {
-            if (Clipboard.ContainsFileDropList())
-            {
-                e.Handled = true;
-                SendFiles(Clipboard.GetFileDropList().Cast<string>());
-            }
-            else if (Clipboard.ContainsImage() && Clipboard.GetImage() is { } image)
-            {
-                e.Handled = true;
-                var dir = Path.Combine(AppPaths.FilesDir, "pasted");
-                Directory.CreateDirectory(dir);
-                var path = Path.Combine(dir, $"Image_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png");
-                using (var stream = File.Create(path))
-                {
-                    var encoder = new PngBitmapEncoder();
-                    encoder.Frames.Add(BitmapFrame.Create(image));
-                    encoder.Save(stream);
-                }
-
-                App.Chat.SendFile(Conversation, path);
-            }
+            return Clipboard.GetDataObject() is { } data
+                   && (data.GetDataPresent(DataFormats.FileDrop) || ClipboardImage.HasPicture(data));
         }
-        catch (Exception ex) when (ex is ExternalException or IOException)
+        catch (ExternalException)
         {
-            Log.Error("Paste", ex);
+            return false;
         }
     }
 
     private void OnAttach(object sender, RoutedEventArgs e)
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = "Send files or images" };
+        var dialog = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = "Attach files or pictures" };
         if (DialogGuard.Run(() => dialog.ShowDialog(Window.GetWindow(this))) == true)
         {
-            SendFiles(dialog.FileNames);
+            AddAttachments(dialog.FileNames);
         }
 
         FocusInput();
@@ -441,7 +555,7 @@ public partial class ChatView : UserControl
     {
         if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
         {
-            SendFiles(files);
+            AddAttachments(files);
         }
     }
 
@@ -937,6 +1051,16 @@ public partial class ChatView : UserControl
             Process.Start("explorer.exe", $"/select,\"{path}\"");
         }
     }
+}
+
+/// <summary>A pasted screenshot or attached file waiting in the message box until the message is sent.</summary>
+public sealed class PendingAttachment(string path)
+{
+    public string Path { get; } = path;
+
+    public string Name => System.IO.Path.GetFileName(Path);
+
+    public bool IsPicture => ChatService.IsImageFile(Path);
 }
 
 public sealed class MessageTemplateSelector : DataTemplateSelector

@@ -466,6 +466,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <!-- "Replying to …" / "Editing message" -->
@@ -482,7 +483,46 @@
                         </DockPanel>
                     </Border>
 
-                    <Grid Grid.Row="1" Margin="10,8,10,0">
+                    <!-- Pasted screenshots and attached files, waiting to be sent with the message (Teams-style) -->
+                    <ItemsControl x:Name="AttachmentTray" Grid.Row="1" Margin="8,8,8,0" Visibility="Collapsed">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type c:PendingAttachment}">
+                                <Grid Margin="2" ToolTip="{Binding Name}">
+                                    <!-- Picture: thumbnail -->
+                                    <Border x:Name="Thumb" Width="72" Height="72" CornerRadius="4" ClipToBounds="True"
+                                            Background="{StaticResource PaneBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+                                        <Image Stretch="UniformToFill" Source="{Binding Path, Converter={StaticResource PathToImage}}" />
+                                    </Border>
+                                    <!-- Other file: name card -->
+                                    <Border x:Name="FileCard" Height="72" MaxWidth="200" Padding="10,0,28,0" CornerRadius="4" Visibility="Collapsed"
+                                            Background="{StaticResource PaneBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+                                        <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                                            <TextBlock Margin="0,0,8,0" VerticalAlignment="Center" FontSize="22" FontFamily="{StaticResource IconFont}"
+                                                       Foreground="{StaticResource AccentBrush}" Text="&#xE8A5;" />
+                                            <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource TextBrush}"
+                                                       Text="{Binding Name}" TextTrimming="CharacterEllipsis" MaxWidth="130" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Button Width="22" Height="22" Margin="3" HorizontalAlignment="Right" VerticalAlignment="Top" FontSize="9"
+                                            Background="#E6FFFFFF" Style="{StaticResource IconButton}" Content="&#xE711;"
+                                            ToolTip="Remove" Click="OnRemoveAttachment" />
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsPicture}" Value="False">
+                                        <Setter TargetName="Thumb" Property="Visibility" Value="Collapsed" />
+                                        <Setter TargetName="FileCard" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Grid Grid.Row="2" Margin="10,8,10,0">
                         <TextBox x:Name="Input" Style="{StaticResource BareTextBox}" AcceptsReturn="True" TextWrapping="Wrap"
                                  MaxLength="20000" MinHeight="22" MaxHeight="140" VerticalScrollBarVisibility="Auto"
                                  PreviewKeyDown="OnInputPreviewKeyDown" />
@@ -490,7 +530,7 @@
                                    Foreground="#8A8A8A" Text="Type a message"
                                    Visibility="{Binding Text, ElementName=Input, Converter={StaticResource EmptyToVisible}}" />
                     </Grid>
-                    <DockPanel Grid.Row="2" Margin="6,2,6,4">
+                    <DockPanel Grid.Row="3" Margin="6,2,6,4">
                         <ToggleButton x:Name="EmojiToggle" Style="{StaticResource IconToggleButton}" Content="&#xE76E;" ToolTip="Emoji" />
                         <ToggleButton x:Name="GifToggle" Style="{StaticResource IconToggleButton}" ToolTip="GIFs">
                             <Border Padding="3,0" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
@@ -502,7 +542,7 @@
                         <Button x:Name="SendButton" DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource IconButton}"
                                 Foreground="{StaticResource AccentBrush}" Content="&#xE724;" ToolTip="Send (Enter)" Click="OnSend" />
                         <TextBlock x:Name="ComposerHint" Margin="8,0" VerticalAlignment="Center" FontSize="11"
-                                   Foreground="#8A8A8A" Text="Enter to send · Shift+Enter for a new line · drop or paste files" />
+                                   Foreground="#8A8A8A" Text="Enter to send · Shift+Enter for a new line · paste screenshots or drop files" />
                     </DockPanel>
                     <Popup x:Name="EmojiPopup" Placement="Top" PlacementTarget="{Binding ElementName=EmojiToggle}"
                            StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade"
