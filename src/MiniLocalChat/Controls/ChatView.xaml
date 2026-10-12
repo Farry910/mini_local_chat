@@ -4,6 +4,8 @@
              xmlns:m="clr-namespace:MiniLocalChat.Models"
              xmlns:c="clr-namespace:MiniLocalChat.Controls"
              xmlns:v="clr-namespace:MiniLocalChat.Views"
+             xmlns:s="clr-namespace:MiniLocalChat.Services"
+             xmlns:gif="https://github.com/XamlAnimatedGif/XamlAnimatedGif"
              AllowDrop="True" DragOver="OnDragOver" Drop="OnDrop"
              Background="{StaticResource ChatBackgroundBrush}">
     <UserControl.Resources>
@@ -18,6 +20,12 @@
                        MaxHeight="280" Cursor="Hand" ToolTip="{Binding FileName}" MouseLeftButtonUp="OnImageClick"
                        MaxWidth="{Binding ImageMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}"
                        Source="{Binding LocalPath, Converter={StaticResource PathToImage}}" />
+
+                <!-- Animated GIF: loops silently, like Telegram. Its source is only set for GIFs (trigger below). -->
+                <Image x:Name="GifPart" Visibility="Collapsed" Stretch="Uniform" StretchDirection="DownOnly"
+                       MaxHeight="280" Cursor="Hand" ToolTip="GIF" MouseLeftButtonUp="OnImageClick"
+                       MaxWidth="{Binding ImageMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}"
+                       gif:AnimationBehavior.RepeatBehavior="Forever" gif:AnimationBehavior.Error="OnGifError" />
 
                 <Grid x:Name="FilePart" Visibility="Collapsed" MinWidth="190">
                     <Grid.ColumnDefinitions>
@@ -53,6 +61,18 @@
                     <Setter TargetName="TextPart" Property="Visibility" Value="Collapsed" />
                     <Setter TargetName="FilePart" Property="Visibility" Value="Visible" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding IsGif}" Value="True">
+                    <Setter TargetName="ImagePart" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="ImagePart" Property="Source" Value="{x:Null}" />
+                    <Setter TargetName="GifPart" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="GifPart" Property="gif:AnimationBehavior.SourceUri"
+                            Value="{Binding LocalPath, Converter={StaticResource PathToUri}}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSticker}" Value="True">
+                    <Setter TargetName="GifPart" Property="MaxWidth" Value="128" />
+                    <Setter TargetName="GifPart" Property="MaxHeight" Value="128" />
+                    <Setter TargetName="GifPart" Property="ToolTip" Value="{Binding Text}" />
+                </DataTrigger>
                 <!-- Last, so it wins over the kind triggers. -->
                 <DataTrigger Binding="{Binding IsDeleted}" Value="True">
                     <Setter TargetName="TextPart" Property="Visibility" Value="Visible" />
@@ -60,6 +80,7 @@
                     <Setter TargetName="TextPart" Property="FontStyle" Value="Italic" />
                     <Setter TargetName="TextPart" Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
                     <Setter TargetName="ImagePart" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="GifPart" Property="Visibility" Value="Collapsed" />
                     <Setter TargetName="FilePart" Property="Visibility" Value="Collapsed" />
                 </DataTrigger>
             </DataTemplate.Triggers>
@@ -187,7 +208,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <c:Avatar Width="32" Height="32" Margin="0,2,10,0" VerticalAlignment="Top"
-                          Text="{Binding Sender.Initials}" Fill="{Binding Sender.AvatarBrush}" Ring="{Binding Sender.RingBrush}"
+                          Text="{Binding Sender.Initials}" Fill="{Binding Sender.AvatarBrush}" Image="{Binding Sender.AvatarImage}"
                           Visibility="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=c:ChatView}, Converter={StaticResource InverseBoolToVisibility}}" />
                 <StackPanel Grid.Column="1">
                     <StackPanel Margin="0,0,0,3" Orientation="Horizontal">
@@ -200,7 +221,7 @@
                                    Visibility="{Binding IsEdited, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                     <Grid HorizontalAlignment="Left">
-                        <Border Padding="12,8" CornerRadius="6" Background="White" MouseRightButtonUp="OnBubbleRightClick"
+                        <Border x:Name="Bubble" Padding="12,8" CornerRadius="6" Background="White" MouseRightButtonUp="OnBubbleRightClick"
                                 MaxWidth="{Binding BubbleMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}">
                             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource BubbleContentTemplate}" Focusable="False" />
                         </Border>
@@ -213,6 +234,10 @@
                 </StackPanel>
             </Grid>
             <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSticker}" Value="True">
+                    <Setter TargetName="Bubble" Property="Background" Value="Transparent" />
+                    <Setter TargetName="Bubble" Property="Padding" Value="0" />
+                </DataTrigger>
                 <MultiDataTrigger>
                     <MultiDataTrigger.Conditions>
                         <Condition Binding="{Binding IsMouseOver, ElementName=Row}" Value="True" />
@@ -233,7 +258,7 @@
                                Text="{Binding SentUtc, Converter={StaticResource MessageTime}}" />
                 </StackPanel>
                 <Grid HorizontalAlignment="Right">
-                    <Border Padding="12,8" CornerRadius="6" Background="{StaticResource AccentLightBrush}" MouseRightButtonUp="OnBubbleRightClick"
+                    <Border x:Name="Bubble" Padding="12,8" CornerRadius="6" Background="{StaticResource AccentLightBrush}" MouseRightButtonUp="OnBubbleRightClick"
                             MaxWidth="{Binding BubbleMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}">
                         <ContentControl Content="{Binding}" ContentTemplate="{StaticResource BubbleContentTemplate}" Focusable="False" />
                     </Border>
@@ -248,6 +273,10 @@
                            Visibility="{Binding DeliveryText, Converter={StaticResource EmptyToCollapsed}}" />
             </StackPanel>
             <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsSticker}" Value="True">
+                    <Setter TargetName="Bubble" Property="Background" Value="Transparent" />
+                    <Setter TargetName="Bubble" Property="Padding" Value="0" />
+                </DataTrigger>
                 <MultiDataTrigger>
                     <MultiDataTrigger.Conditions>
                         <Condition Binding="{Binding IsMouseOver, ElementName=Row}" Value="True" />
@@ -304,6 +333,35 @@
             </Setter>
         </Style>
 
+        <!-- Tabs in the GIF panel: text with an accent underline when selected -->
+        <Style x:Key="PanelTab" TargetType="RadioButton">
+            <Setter Property="Margin" Value="0,0,14,0" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <StackPanel Background="Transparent">
+                            <ContentPresenter Margin="2,2,2,4" />
+                            <Border x:Name="Underline" Height="2" CornerRadius="1" Background="{StaticResource AccentBrush}" Visibility="Hidden" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Star: hollow, or filled gold for favorites -->
         <Style x:Key="FavoriteGlyph" TargetType="TextBlock">
             <Setter Property="Text" Value="&#xE734;" />
@@ -338,7 +396,7 @@
                         <TextBlock Style="{StaticResource FavoriteGlyph}" />
                     </Button>
                     <c:Avatar Width="36" Height="36" Margin="0,0,12,0"
-                              Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" Ring="{Binding AvatarRing}" IsGroup="{Binding IsGroup}"
+                              Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" Image="{Binding AvatarImage}" IsGroup="{Binding IsGroup}"
                               ShowPresence="{Binding IsGroup, Converter={StaticResource InverseBool}}"
                               IsOnline="{Binding Peer.IsOnline, FallbackValue=False}" />
                     <StackPanel VerticalAlignment="Center">
@@ -434,6 +492,12 @@
                     </Grid>
                     <DockPanel Grid.Row="2" Margin="6,2,6,4">
                         <ToggleButton x:Name="EmojiToggle" Style="{StaticResource IconToggleButton}" Content="&#xE76E;" ToolTip="Emoji" />
+                        <ToggleButton x:Name="GifToggle" Style="{StaticResource IconToggleButton}" ToolTip="GIFs">
+                            <Border Padding="3,0" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                    BorderThickness="1.5" CornerRadius="3">
+                                <TextBlock FontFamily="Segoe UI" FontSize="9" FontWeight="Bold" Text="GIF" />
+                            </Border>
+                        </ToggleButton>
                         <Button x:Name="AttachButton" Style="{StaticResource IconButton}" Content="&#xE723;" ToolTip="Attach files or images" Click="OnAttach" />
                         <Button x:Name="SendButton" DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource IconButton}"
                                 Foreground="{StaticResource AccentBrush}" Content="&#xE724;" ToolTip="Send (Enter)" Click="OnSend" />
@@ -457,6 +521,95 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                        </Border>
+                    </Popup>
+
+                    <!-- Emoji stickers + saved GIFs (Telegram-style). Tiles only exist while the panel is open,
+                         and animate only while hovered, to keep the panel light. -->
+                    <Popup x:Name="GifPopup" Placement="Top" PlacementTarget="{Binding ElementName=GifToggle}"
+                           StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade"
+                           IsOpen="{Binding IsChecked, ElementName=GifToggle}" Opened="OnGifPanelOpened" Closed="OnGifPanelClosed">
+                        <Border x:Name="GifPanel" Width="340" Height="360" Margin="0,0,0,4" Background="White"
+                                BorderBrush="{StaticResource DividerBrush}" BorderThickness="1" CornerRadius="6">
+                            <DockPanel Margin="8">
+                                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8" Orientation="Horizontal">
+                                    <RadioButton x:Name="EmojiTab" Style="{StaticResource PanelTab}" Content="Emoji" IsChecked="True" Checked="OnGifTabChanged" />
+                                    <RadioButton x:Name="SavedTab" Style="{StaticResource PanelTab}" Content="Saved GIFs" Checked="OnGifTabChanged" />
+                                </StackPanel>
+                                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                    <Button x:Name="AddGifButton" DockPanel.Dock="Right" Margin="8,0,0,0" Padding="10,3" MinWidth="0" FontSize="12"
+                                            Style="{StaticResource SecondaryButton}" Content="Add GIF…" Click="OnAddGif" Visibility="Collapsed" />
+                                    <Border Height="28" Background="White" CornerRadius="4" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1">
+                                        <Grid Margin="8,0">
+                                            <TextBox x:Name="GifFilter" Style="{StaticResource BareTextBox}" FontSize="12" TextChanged="OnGifFilterChanged" />
+                                            <TextBlock x:Name="GifFilterHint" Margin="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" FontSize="12"
+                                                       Foreground="#8A8A8A" Text="Search emoji"
+                                                       Visibility="{Binding Text, ElementName=GifFilter, Converter={StaticResource EmptyToVisible}}" />
+                                        </Grid>
+                                    </Border>
+                                </DockPanel>
+                                <TextBlock x:Name="StickerCredit" DockPanel.Dock="Bottom" Margin="0,6,0,0" FontSize="10"
+                                           Foreground="{StaticResource SubtleTextBrush}" Text="{x:Static s:EmojiStickers.Credit}" />
+                                <Grid>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <Grid>
+                                            <!-- Built-in animated emoji -->
+                                            <ItemsControl x:Name="StickerGrid">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type s:EmojiSticker}">
+                                                        <Border Width="60" Height="60" Margin="2" Padding="4" CornerRadius="6" Background="Transparent"
+                                                                Cursor="Hand" ToolTip="{Binding Name}" MouseEnter="OnTileMouseEnter" MouseLeave="OnTileMouseLeave"
+                                                                MouseLeftButtonUp="OnStickerPicked">
+                                                            <Image Stretch="Uniform"
+                                                                   gif:AnimationBehavior.SourceUri="{Binding Path, Converter={StaticResource PathToUri}}"
+                                                                   gif:AnimationBehavior.AutoStart="False" gif:AnimationBehavior.RepeatBehavior="Forever" />
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <!-- Saved GIFs -->
+                                            <ItemsControl x:Name="GifGrid" Visibility="Collapsed">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type s:SavedGif}">
+                                                        <Border x:Name="Tile" Width="100" Height="84" Margin="2" CornerRadius="4" ClipToBounds="True"
+                                                                Background="{StaticResource PaneBrush}" Cursor="Hand" ToolTip="{Binding Name}"
+                                                                MouseEnter="OnTileMouseEnter" MouseLeave="OnTileMouseLeave" MouseLeftButtonUp="OnGifPicked">
+                                                            <Grid>
+                                                                <Image Stretch="UniformToFill"
+                                                                       gif:AnimationBehavior.SourceUri="{Binding Path, Converter={StaticResource PathToUri}}"
+                                                                       gif:AnimationBehavior.AutoStart="False" gif:AnimationBehavior.RepeatBehavior="Forever" />
+                                                                <Button x:Name="RemoveButton" Width="20" Height="20" Margin="3" FontSize="9"
+                                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Background="#CCFFFFFF"
+                                                                        Style="{StaticResource IconButton}" Content="&#xE711;"
+                                                                        ToolTip="Remove from saved GIFs" Visibility="Collapsed" Click="OnRemoveGif" />
+                                                            </Grid>
+                                                        </Border>
+                                                        <DataTemplate.Triggers>
+                                                            <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="RemoveButton" Property="Visibility" Value="Visible" />
+                                                            </Trigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Grid>
+                                    </ScrollViewer>
+                                    <TextBlock x:Name="GifEmpty" Margin="20" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               TextAlignment="Center" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
+                                               Visibility="Collapsed" />
+                                </Grid>
+                            </DockPanel>
                         </Border>
                     </Popup>
                 </Grid>

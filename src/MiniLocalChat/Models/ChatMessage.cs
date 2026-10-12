@@ -83,6 +83,9 @@ public sealed class ChatMessage : ObservableObject
 
     public bool IsForwarded { get; set; }
 
+    /// <summary>A built-in animated emoji: shown small, without a bubble. <see cref="Text"/> holds the emoji.</summary>
+    public bool IsSticker { get; set; }
+
     public bool IsEdited
     {
         get => _isEdited;
@@ -122,6 +125,12 @@ public sealed class ChatMessage : ObservableObject
     [JsonIgnore]
     public bool CanDelete => IsMine && Kind != MessageKind.System && !IsDeleted;
 
+    /// <summary>An animated GIF: plays inline in the chat.</summary>
+    [JsonIgnore]
+    public bool IsGif => Kind == MessageKind.Image
+        && (string.Equals(Path.GetExtension(FileName), ".gif", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(Path.GetExtension(LocalPath), ".gif", StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Reply, forward, react…: not for deleted messages or system lines.</summary>
     [JsonIgnore]
     public bool HasActions => Kind != MessageKind.System && !IsDeleted;
@@ -131,6 +140,8 @@ public sealed class ChatMessage : ObservableObject
         ? "This message has been deleted"
         : Kind switch
         {
+            MessageKind.Image when IsSticker => $"{Text} Sticker",
+            MessageKind.Image when IsGif => "GIF",
             MessageKind.Image => "📷 Image",
             MessageKind.File => "📎 " + FileName,
             _ => Text.ReplaceLineEndings(" "),

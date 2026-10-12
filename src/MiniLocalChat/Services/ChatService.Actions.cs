@@ -32,6 +32,15 @@ public sealed partial class ChatService
             return;
         }
 
+        // Like Telegram: GIFs I send go to my saved GIFs, and the message points at the stored copy.
+        if (GifLibrary.IsGif(path))
+        {
+            var name = info.Name;
+            info = new FileInfo(GifLibrary.Add(path));
+            Post(conversation, new ChatMessage { Kind = MessageKind.Image, FileName = name, FileSize = info.Length, LocalPath = info.FullName, IsForwarded = forwarded });
+            return;
+        }
+
         Post(conversation, new ChatMessage
         {
             Kind = IsImageFile(path) ? MessageKind.Image : MessageKind.File,
@@ -40,6 +49,24 @@ public sealed partial class ChatService
             LocalPath = info.FullName,
             IsForwarded = forwarded,
         });
+    }
+
+    /// <summary>A built-in animated emoji, sent as a sticker (not added to saved GIFs).</summary>
+    public void SendSticker(Conversation conversation, EmojiSticker sticker)
+    {
+        var info = new FileInfo(sticker.Path);
+        if (info.Exists)
+        {
+            Post(conversation, new ChatMessage
+            {
+                Kind = MessageKind.Image,
+                Text = sticker.Emoji,
+                FileName = info.Name,
+                FileSize = info.Length,
+                LocalPath = info.FullName,
+                IsSticker = true,
+            });
+        }
     }
 
     /// <summary>Sends a copy of a message to other chats. Returns false if its file is no longer on this computer.</summary>
@@ -57,7 +84,15 @@ public sealed partial class ChatService
 
         foreach (var target in targets)
         {
-            if (message.Kind == MessageKind.Text)
+            if (message.IsSticker)
+            {
+                Post(target, new ChatMessage
+                {
+                    Kind = MessageKind.Image, Text = message.Text, FileName = message.FileName, FileSize = message.FileSize,
+                    LocalPath = message.LocalPath, IsSticker = true, IsForwarded = true,
+                });
+            }
+            else if (message.Kind == MessageKind.Text)
             {
                 Post(target, new ChatMessage { Kind = MessageKind.Text, Text = message.Text, IsForwarded = true });
             }

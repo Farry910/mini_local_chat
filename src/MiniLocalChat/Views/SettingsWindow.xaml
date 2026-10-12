@@ -4,57 +4,7 @@
         Title="Settings" Width="460" SizeToContent="Height" ResizeMode="NoResize"
         xmlns:c="clr-namespace:MiniLocalChat.Controls"
         WindowStartupLocation="CenterOwner" FontFamily="Segoe UI" Background="White">
-    <Window.Resources>
-        <!-- A row of color swatches; the selected one gets a dark ring. -->
-        <Style x:Key="SwatchList" TargetType="ListBox">
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
-            <Setter Property="ItemsPanel">
-                <Setter.Value>
-                    <ItemsPanelTemplate>
-                        <UniformGrid Columns="8" />
-                    </ItemsPanelTemplate>
-                </Setter.Value>
-            </Setter>
-            <Setter Property="ItemContainerStyle">
-                <Setter.Value>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="Cursor" Value="Hand" />
-                        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-                        <Setter Property="ToolTip" Value="{Binding}" />
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ListBoxItem">
-                                    <Grid Width="28" Height="28" Background="Transparent">
-                                        <Ellipse x:Name="Selection" Stroke="{StaticResource TextBrush}" StrokeThickness="2" Visibility="Hidden" />
-                                        <Ellipse Margin="4" Fill="{Binding}" />
-                                    </Grid>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsSelected" Value="True">
-                                            <Setter TargetName="Selection" Property="Visibility" Value="Visible" />
-                                        </Trigger>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Selection" Property="Visibility" Value="Visible" />
-                                            <Setter TargetName="Selection" Property="Stroke" Value="#9E9E9E" />
-                                        </Trigger>
-                                        <MultiTrigger>
-                                            <MultiTrigger.Conditions>
-                                                <Condition Property="IsSelected" Value="True" />
-                                                <Condition Property="IsMouseOver" Value="True" />
-                                            </MultiTrigger.Conditions>
-                                            <Setter TargetName="Selection" Property="Stroke" Value="{StaticResource TextBrush}" />
-                                        </MultiTrigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
+
     <StackPanel Margin="24,20,24,20">
         <TextBlock x:Name="Heading" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextBrush}" Text="Settings" />
         <TextBlock x:Name="Intro" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource SubtleTextBrush}"
@@ -66,13 +16,21 @@
         <TextBlock x:Name="NicknameError" Margin="0,4,0,0" FontSize="12" Foreground="#C4314B" Visibility="Collapsed"
                    Text="Please enter a nickname." />
 
-        <TextBlock Style="{StaticResource FieldLabel}" Text="Your colors" />
+        <TextBlock Style="{StaticResource FieldLabel}" Text="Your picture and colors" />
         <DockPanel>
-            <c:Avatar x:Name="ColorPreview" DockPanel.Dock="Left" Width="56" Height="56" Margin="0,2,16,0" VerticalAlignment="Top" />
+            <StackPanel DockPanel.Dock="Left" Width="72" Margin="0,2,12,0">
+                <c:Avatar x:Name="ColorPreview" Width="56" Height="56" HorizontalAlignment="Center" />
+                <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" FontSize="12">
+                    <Hyperlink Click="OnChoosePicture" Foreground="{StaticResource AccentBrush}">Choose picture…</Hyperlink>
+                </TextBlock>
+                <TextBlock x:Name="RemovePictureLink" Margin="0,4,0,0" HorizontalAlignment="Center" FontSize="12">
+                    <Hyperlink Click="OnRemovePicture" Foreground="{StaticResource SubtleTextBrush}">Remove picture</Hyperlink>
+                </TextBlock>
+            </StackPanel>
             <StackPanel>
-                <TextBlock FontSize="12" Foreground="{StaticResource SubtleTextBrush}" Text="Avatar · first wave" />
+                <TextBlock FontSize="12" Foreground="{StaticResource SubtleTextBrush}" Text="Avatar background · first wave" />
                 <ListBox x:Name="Color1List" Style="{StaticResource SwatchList}" SelectionChanged="OnColorChanged" />
-                <TextBlock Margin="0,6,0,0" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" Text="Ring · second wave" />
+                <TextBlock Margin="0,6,0,0" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" Text="Second wave" />
                 <ListBox x:Name="Color2List" Style="{StaticResource SwatchList}" SelectionChanged="OnColorChanged" />
             </StackPanel>
         </DockPanel>
@@ -80,7 +38,7 @@
             <Button x:Name="PreviewRippleButton" DockPanel.Dock="Right" Margin="12,0,0,0" VerticalAlignment="Top"
                     Style="{StaticResource SecondaryButton}" Content="Preview ripple" Click="OnPreviewRipple" />
             <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
-                       Text="Everyone sees these on your avatar, and their screen ripples in these colors when you message them." />
+                       Text="Everyone sees your picture (or your initials on the first color), and their screen ripples in these two colors when you message them." />
         </DockPanel>
 
         <TextBlock Style="{StaticResource FieldLabel}" Text="Your IP address (your identity)" />
@@ -125,6 +83,10 @@
                 <Run Text="Chats and received files are stored in " />
                 <Hyperlink Click="OnOpenDataFolder" Foreground="{StaticResource AccentBrush}">your data folder</Hyperlink>
                 <Run Text="." />
+            </TextBlock>
+            <TextBlock Margin="0,6,0,0" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" TextWrapping="Wrap">
+                <Hyperlink Click="OnOpenEmojiCredit" Foreground="{StaticResource SubtleTextBrush}">Animated emoji: Noto Emoji by Google</Hyperlink>
+                <Run Text=", licensed CC BY 4.0." />
             </TextBlock>
         </StackPanel>
 

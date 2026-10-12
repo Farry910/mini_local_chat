@@ -12,7 +12,9 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MiniLocalChat.Infrastructure;
 using MiniLocalChat.Models;
+using MiniLocalChat.Services;
 using MiniLocalChat.Views;
+using XamlAnimatedGif;
 
 namespace MiniLocalChat.Controls;
 
@@ -53,6 +55,10 @@ public partial class ChatView : UserControl
     private ChatMessage? _replyTo;
     private ChatMessage? _editing;
     private string _draftBeforeEdit = "";
+    private bool _watchingWindow;
+    private bool _pinnedToBottom = true;
+    private ListCollectionView? _savedGifs;
+    private ListCollectionView? _stickers;
 
     public ChatView()
     {
@@ -60,6 +66,17 @@ public partial class ChatView : UserControl
         EmojiGrid.ItemsSource = Emojis;
         CommandManager.AddPreviewExecutedHandler(Input, OnInputPreviewExecuted);
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Find, (_, _) => OpenSearch()));
+
+        // GIFs only play while they can be seen: not in the tray, not minimized.
+        IsVisibleChanged += (_, _) => UpdateGifPlayback();
+        Loaded += (_, _) =>
+        {
+            if (Window.GetWindow(this) is { } window && !_watchingWindow)
+            {
+                _watchingWindow = true;
+                window.StateChanged += (_, _) => UpdateGifPlayback();
+            }
+        };
         ApplyLayoutMode();
     }
 
@@ -97,9 +114,34 @@ public partial class ChatView : UserControl
             {
                 MessageList.ApplyTemplate();
                 _scroller = MessageList.Template.FindName("Scroller", MessageList) as ScrollViewer;
+                if (_scroller is not null)
+                {
+                    _scroller.ScrollChanged += OnScrollChanged;
+                }
             }
 
             return _scroller;
+        }
+    }
+
+    /// <summary>
+    /// Keeps the chat pinned to the newest message while content above it grows, e.g. a GIF or picture
+    /// that finishes loading after the chat already scrolled down. Scrolling up yourself unpins it.
+    /// </summary>
+    private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer scroller)
+        {
+            return;
+        }
+
+        if (e.ExtentHeightChange > 0 && _pinnedToBottom)
+        {
+            scroller.ScrollToEnd();
+        }
+        else if (e.ExtentHeightChange == 0)
+        {
+            _pinnedToBottom = scroller.VerticalOffset >= scroller.ScrollableHeight - 2;
         }
     }
 
@@ -163,6 +205,7 @@ public partial class ChatView : UserControl
         Composer.Margin = compact ? new Thickness(8, 2, 8, 8) : new Thickness(20, 4, 20, 16);
         BubbleMaxWidth = compact ? 270 : 560;
         ImageMaxWidth = compact ? 230 : 320;
+        GifPanel.Width = compact ? 316 : 340;
         EmptyState.Visibility = compact || Conversation is not null ? Visibility.Collapsed : Visibility.Visible;
     }
 
@@ -188,6 +231,7 @@ public partial class ChatView : UserControl
     // so one ScrollToEnd can stop short. Repeat after each layout pass until we're really at the bottom.
     private void ScrollToEndSoon(int attemptsLeft = 10)
     {
+        _pinnedToBottom = true;
         Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
         {
             if (Scroller is not { } scroller)
@@ -446,6 +490,11 @@ public partial class ChatView : UserControl
         AddItem(menu, "Reply", "", () => StartReply(message));
         AddItem(menu, "Forward", "", () => Forward(message));
         AddItem(menu, "Copy", "", () => Copy(message));
+        if (message.IsGif && !message.IsSticker && message.LocalPath is { } gifPath && File.Exists(gifPath) && !GifLibrary.Contains(gifPath))
+        {
+            AddItem(menu, "Save GIF", "", () => GifLibrary.Add(gifPath));
+        }
+
         if (message.CanEdit || message.CanDelete)
         {
             menu.Items.Add(new Separator());
@@ -693,6 +742,174 @@ public partial class ChatView : UserControl
         var count = searching ? _messages?.Count ?? 0 : 0;
         SearchCount.Text = searching ? count == 1 ? "1 result" : $"{count} results" : "";
         NoResults.Visibility = searching && count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ---- GIFs -----------------------------------------------------------------------------------
+
+    private void UpdateGifPlayback()
+    {
+        var play = IsVisible && Window.GetWindow(this) is not { WindowState: WindowState.Minimized };
+        foreach (var image in FindDescendants<Image>(MessageList))
+        {
+            if (AnimationBehavior.GetAnimator(image) is { } animator)
+            {
+                if (play)
+                {
+                    animator.Play();
+                }
+                else
+                {
+                    animator.Pause();
+                }
+            }
+        }
+    }
+
+    private void OnGifError(object sender, AnimationErrorEventArgs e) =>
+        Log.Error($"GIF ({e.Kind})", e.Exception);
+
+    private string GifQuery => GifFilter.Text.Trim();
+
+    private void OnGifPanelOpened(object? sender, EventArgs e)
+    {
+        GifFilter.Text = "";
+        _stickers = new ListCollectionView(EmojiStickers.Available().ToList())
+        {
+            Filter = o => o is EmojiSticker s && (GifQuery.Length == 0 || s.Keywords.Contains(GifQuery, StringComparison.CurrentCultureIgnoreCase)),
+        };
+        _savedGifs = new ListCollectionView(GifLibrary.Items)
+        {
+            Filter = o => o is SavedGif gif && (GifQuery.Length == 0 || gif.Name.Contains(GifQuery, StringComparison.CurrentCultureIgnoreCase)),
+        };
+        StickerGrid.ItemsSource = _stickers;
+        GifGrid.ItemsSource = _savedGifs;
+        UpdateGifTab();
+        GifFilter.Focus();
+    }
+
+    // Dropping the tiles stops their animations while the panel is closed.
+    private void OnGifPanelClosed(object? sender, EventArgs e)
+    {
+        StickerGrid.ItemsSource = null;
+        GifGrid.ItemsSource = null;
+        _stickers = null;
+        _savedGifs = null;
+    }
+
+    private void OnGifTabChanged(object sender, RoutedEventArgs e)
+    {
+        if (IsInitialized)
+        {
+            UpdateGifTab();
+        }
+    }
+
+    private void OnGifFilterChanged(object sender, TextChangedEventArgs e)
+    {
+        _stickers?.Refresh();
+        _savedGifs?.Refresh();
+        UpdateGifTab();
+    }
+
+    private void UpdateGifTab()
+    {
+        var emoji = EmojiTab.IsChecked == true;
+        StickerGrid.Visibility = emoji ? Visibility.Visible : Visibility.Collapsed;
+        GifGrid.Visibility = emoji ? Visibility.Collapsed : Visibility.Visible;
+        AddGifButton.Visibility = emoji ? Visibility.Collapsed : Visibility.Visible;
+        StickerCredit.Visibility = emoji ? Visibility.Visible : Visibility.Collapsed;
+        GifFilterHint.Text = emoji ? "Search emoji" : "Search saved GIFs";
+
+        var view = emoji ? _stickers : _savedGifs;
+        GifEmpty.Visibility = view is { IsEmpty: true } ? Visibility.Visible : Visibility.Collapsed;
+        GifEmpty.Text = emoji ? "No emoji match."
+            : GifLibrary.Items.Count == 0 ? "No saved GIFs yet. GIFs you send are saved here automatically, or use “Add GIF…”."
+            : "No saved GIFs match.";
+    }
+
+    private void OnStickerPicked(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: EmojiSticker sticker } && Conversation is { } conversation)
+        {
+            GifToggle.IsChecked = false;
+            App.Chat.SendSticker(conversation, sticker);
+            FocusInput();
+        }
+    }
+
+    // Panel tiles show a still frame and animate while hovered.
+    private void OnTileMouseEnter(object sender, MouseEventArgs e) => TileAnimator(sender)?.Play();
+
+    private void OnTileMouseLeave(object sender, MouseEventArgs e)
+    {
+        if (TileAnimator(sender) is { } animator)
+        {
+            animator.Pause();
+            animator.Rewind();
+        }
+    }
+
+    private static Animator? TileAnimator(object sender) =>
+        sender is DependencyObject tile && FindDescendants<Image>(tile).FirstOrDefault() is { } image
+            ? AnimationBehavior.GetAnimator(image)
+            : null;
+
+    private void OnGifPicked(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: SavedGif gif } && Conversation is { } conversation)
+        {
+            GifToggle.IsChecked = false;
+            App.Chat.SendFile(conversation, gif.Path);
+            FocusInput();
+        }
+    }
+
+    private void OnRemoveGif(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: SavedGif gif })
+        {
+            GifLibrary.Remove(gif);
+            UpdateGifTab();
+        }
+    }
+
+    private void OnAddGif(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = "Add GIFs", Filter = "GIF animations|*.gif" };
+        if (DialogGuard.Run(() => dialog.ShowDialog(Window.GetWindow(this))) == true)
+        {
+            foreach (var file in dialog.FileNames)
+            {
+                try
+                {
+                    GifLibrary.Add(file);
+                }
+                catch (IOException ex)
+                {
+                    Log.Error("Adding GIF", ex);
+                }
+            }
+        }
+
+        // The file dialog closed the panel; bring it back with the new GIFs on top.
+        GifToggle.IsChecked = true;
+    }
+
+    private static IEnumerable<T> FindDescendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+            {
+                yield return match;
+            }
+
+            foreach (var nested in FindDescendants<T>(child))
+            {
+                yield return nested;
+            }
+        }
     }
 
     // ---- Attachments ----------------------------------------------------------------------------

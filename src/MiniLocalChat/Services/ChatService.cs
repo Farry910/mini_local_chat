@@ -96,6 +96,7 @@ public sealed partial class ChatService : ObservableObject
         Me.Nickname = Settings.Nickname;
         Me.Color1 = Settings.AvatarColor1;
         Me.Color2 = Settings.AvatarColor2;
+        Me.AvatarId = Settings.AvatarId;
 
         foreach (var contact in _storage.Load<List<Contact>>(ContactsFile) ?? [])
         {
@@ -134,7 +135,7 @@ public sealed partial class ChatService : ObservableObject
         _server.Start();
 
         _presence = new PresenceService(BindAddress, Settings.UdpPort,
-            () => new PresencePacket { Nick = Me.Nickname, Colors = MyColors() }, () => _knownIps,
+            () => new PresencePacket { Nick = Me.Nickname, Colors = MyColors(), Avatar = Me.AvatarId }, () => _knownIps,
             (ip, packet) => _ui.InvokeAsync(() => HandlePresence(ip, packet)));
         _presence.Start();
 
@@ -185,17 +186,19 @@ public sealed partial class ChatService : ObservableObject
         return clean.Length > MaxNicknameLength ? clean[..MaxNicknameLength] : clean;
     }
 
-    public void ApplyProfile(string nickname, string? myIp, string? color1, string? color2)
+    public void ApplyProfile(string nickname, string? myIp, string? color1, string? color2, string? avatarId)
     {
         Settings.Nickname = CleanNickname(nickname);
         Settings.MyIp = NetUtil.Normalize(myIp);
         Settings.AvatarColor1 = AvatarPalette.NormalizeHex(color1);
         Settings.AvatarColor2 = AvatarPalette.NormalizeHex(color2);
+        Settings.AvatarId = AvatarStore.PathFor(avatarId) is null ? null : avatarId;
         SaveSettings();
 
         Me.Nickname = Settings.Nickname;
         Me.Color1 = Settings.AvatarColor1;
         Me.Color2 = Settings.AvatarColor2;
+        Me.AvatarId = Settings.AvatarId;
         if (BindAddress is null)
         {
             Me.Ip = ResolveMyIp(Settings.MyIp);
@@ -342,11 +345,12 @@ public sealed partial class ChatService : ObservableObject
         header.Id = message.Id;
         header.SentUtc = message.SentUtc;
         header.Kind = message.Kind;
-        header.Text = message.Kind == MessageKind.Text ? message.Text : null;
+        header.Text = message.Kind == MessageKind.Text || message.IsSticker ? message.Text : null;
         header.FileName = message.FileName;
         header.FileSize = message.FileSize;
         header.ReplyTo = message.ReplyTo;
         header.Forwarded = message.IsForwarded;
+        header.Sticker = message.IsSticker;
 
         return new OutgoingItem(message, recipientIp, header, message.Kind == MessageKind.Text ? null : message.LocalPath);
     }
@@ -360,6 +364,7 @@ public sealed partial class ChatService : ObservableObject
             Id = Guid.NewGuid(),
             Nick = Me.Nickname,
             Colors = MyColors(),
+            Avatar = Me.AvatarId,
             SentUtc = DateTime.UtcNow,
         };
 
@@ -422,6 +427,7 @@ public sealed partial class ChatService : ObservableObject
         }
 
         ApplyColors(sender, header.Colors);
+        ApplyAvatar(sender, header.Avatar);
         MarkSeen(sender);
 
         // Already have it: the sender missed our ACK and retried.
@@ -447,6 +453,12 @@ public sealed partial class ChatService : ObservableObject
             case WireTypes.Group:
                 ReceiveGroupChange(header, sender);
                 break;
+            case WireTypes.AvatarGet:
+                ReceiveAvatarRequest(header, sender);
+                return true;
+            case WireTypes.Avatar:
+                ReceiveAvatar(header, packet.FilePath);
+                return true;
         }
 
         ScheduleSave();
@@ -472,8 +484,13 @@ public sealed partial class ChatService : ObservableObject
             LocalPath = filePath,
             ReplyTo = CleanReply(header.ReplyTo),
             IsForwarded = header.Forwarded,
+            IsSticker = header.Sticker && header.Kind == MessageKind.Image && filePath is not null,
             Sender = sender,
         };
+        if (message.IsSticker)
+        {
+            message.Text = Truncate(header.Text, 16);
+        }
 
         AddToConversation(conversation, message);
         if (!IsConversationVisible(conversation))
@@ -572,6 +589,7 @@ public sealed partial class ChatService : ObservableObject
         }
 
         ApplyColors(contact, packet.Colors);
+        ApplyAvatar(contact, packet.Avatar);
         if (packet.Kind == PresenceKinds.Bye)
         {
             contact.IsOnline = false;
@@ -697,7 +715,7 @@ public sealed partial class ChatService : ObservableObject
                 }
 
                 break;
-            case nameof(Contact.Nickname) or nameof(Contact.Color1) or nameof(Contact.Color2):
+            case nameof(Contact.Nickname) or nameof(Contact.Color1) or nameof(Contact.Color2) or nameof(Contact.AvatarId) or nameof(Contact.AvatarImage):
                 foreach (var conversation in Conversations.Where(c => c.Members.Contains(contact)))
                 {
                     conversation.RefreshDisplay();

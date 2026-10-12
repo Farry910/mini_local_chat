@@ -9,6 +9,8 @@
     <!-- Only for the tray icon (NotifyIcon) and monitor work areas (Screen). -->
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>MiniLocalChat</RootNamespace>
+    <!-- Exe icon (Explorer, taskbar, shortcuts). Regenerate with tools\make-icon.ps1. -->
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <AssemblyName>MiniLocalChat</AssemblyName>
     <Product>Mini Local Chat</Product>
     <!-- Shown in the title bar, together with the git commit the build came from. -->
@@ -20,6 +22,16 @@
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
     <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="XamlAnimatedGif" Version="2.3.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Built-in animated emoji stickers (Google Noto Animated Emoji, CC BY 4.0). Embedded so the
+         single-file exe carries them; unpacked on first run. Regenerate with tools\fetch-emoji.ps1. -->
+    <EmbeddedResource Include="Assets\Emoji\*.gif" LogicalName="Emoji.%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

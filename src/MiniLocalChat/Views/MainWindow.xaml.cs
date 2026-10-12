@@ -33,10 +33,12 @@ public partial class MainWindow : Window
     private Conversation? SelectedConversation => ConversationList.SelectedItem as Conversation;
 
     public bool IsShowing(Conversation conversation) =>
-        IsVisible && IsActive && WindowState != WindowState.Minimized && ReferenceEquals(SelectedConversation, conversation);
+        IsVisible && IsActive && WindowState != WindowState.Minimized && ChatPane.Visibility == Visibility.Visible
+        && ReferenceEquals(SelectedConversation, conversation);
 
     public void OpenConversation(Conversation conversation)
     {
+        ShowPage(alarms: false);
         if (!_conversations.PassesFilter(conversation))
         {
             SearchBox.Text = "";
@@ -60,7 +62,8 @@ public partial class MainWindow : Window
 
     private void MarkSelectedRead()
     {
-        if (SelectedConversation is { } conversation && IsActive && WindowState != WindowState.Minimized)
+        if (SelectedConversation is { } conversation && IsActive && WindowState != WindowState.Minimized
+            && ChatPane.Visibility == Visibility.Visible)
         {
             _chat.MarkRead(conversation);
         }
@@ -85,6 +88,24 @@ public partial class MainWindow : Window
     }
 
     private void OnSettings(object sender, RoutedEventArgs e) => App.Current.ShowSettings();
+
+    private void OnShowChat(object sender, RoutedEventArgs e) => ShowPage(alarms: false);
+
+    private void OnShowAlarms(object sender, RoutedEventArgs e) => ShowPage(alarms: true);
+
+    /// <summary>Switches between the chat (list + conversation) and the Alarms page.</summary>
+    public void ShowPage(bool alarms)
+    {
+        AlarmsPage.Visibility = alarms ? Visibility.Visible : Visibility.Collapsed;
+        ChatListPane.Visibility = alarms ? Visibility.Collapsed : Visibility.Visible;
+        ChatPane.Visibility = alarms ? Visibility.Collapsed : Visibility.Visible;
+        ChatRailButton.Tag = alarms ? null : "Active";
+        AlarmsRailButton.Tag = alarms ? "Active" : null;
+        if (!alarms)
+        {
+            MarkSelectedRead();
+        }
+    }
 
     private sealed class RelayCommand(Action execute) : ICommand
     {

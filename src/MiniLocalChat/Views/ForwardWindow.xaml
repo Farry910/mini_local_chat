@@ -46,7 +46,7 @@
                                 <DockPanel>
                                     <c:Avatar Width="30" Height="30" Margin="0,0,10,0"
                                               Text="{Binding Conversation.AvatarText}" Fill="{Binding Conversation.AvatarBrush}"
-                                              Ring="{Binding Conversation.AvatarRing}" IsGroup="{Binding Conversation.IsGroup}" />
+                                              Image="{Binding Conversation.AvatarImage}" IsGroup="{Binding Conversation.IsGroup}" />
                                     <TextBlock VerticalAlignment="Center" FontSize="14" Foreground="{StaticResource TextBrush}"
                                                Text="{Binding Conversation.Title}" TextTrimming="CharacterEllipsis" />
                                 </DockPanel>

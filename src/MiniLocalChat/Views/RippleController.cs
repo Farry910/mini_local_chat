@@ -29,13 +29,14 @@ public sealed class RippleController
         _chat.MessageReceived += OnMessageReceived;
     }
 
-    /// <summary>Plays the ripple right away, e.g. to preview colors in Settings.</summary>
-    public void Play(string color1, string color2)
+    /// <summary>Plays the ripple right away (e.g. a colors preview, or an alarm from the screen center).</summary>
+    public void Play(string color1, string color2, bool fromScreenCenter = false)
     {
         _lastPlayedUtc = DateTime.UtcNow;
         var first = AvatarPalette.ToColor(color1);
         var second = AvatarPalette.ToColor(color2);
-        var origin = _origin();
+        var area = SystemParameters.WorkArea;
+        var origin = fromScreenCenter ? new Point(area.Left + area.Width / 2, area.Top + area.Height / 2) : _origin();
         foreach (var window in OverlayWindows())
         {
             window.Play(new Point(origin.X - window.Bounds.Left, origin.Y - window.Bounds.Top), first, second);

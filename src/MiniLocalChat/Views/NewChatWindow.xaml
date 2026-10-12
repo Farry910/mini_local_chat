@@ -43,7 +43,7 @@
                                           IsChecked="{Binding IsSelected}">
                                     <DockPanel>
                                         <c:Avatar Width="30" Height="30" Margin="0,0,10,0" ShowPresence="True"
-                                                  Text="{Binding Contact.Initials}" Fill="{Binding Contact.AvatarBrush}" Ring="{Binding Contact.RingBrush}"
+                                                  Text="{Binding Contact.Initials}" Fill="{Binding Contact.AvatarBrush}" Image="{Binding Contact.AvatarImage}"
                                                   IsOnline="{Binding Contact.IsOnline}" />
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock FontSize="14" Foreground="{StaticResource TextBrush}" Text="{Binding Contact.DisplayName}" />

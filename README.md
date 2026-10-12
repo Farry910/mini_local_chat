@@ -13,7 +13,11 @@ A Teams-style private chat for computers on the same local network (e.g. a `192.
   - glowing green with a number: unread messages
   - hover it: a mini panel lists only the chats with new messages, so you can read and reply without opening the app
   - drag it up/down or to the other side; double-click it to open the full app
-- **Personal colors.** Each user picks two colors in Settings: their avatar fill and its ring. Everyone else sees them on that person's avatar.
+- **Personal colors and picture.** Each user picks two colors in Settings (the first is the avatar background; both are their ripple colors) and optionally a profile picture, which replaces the initials. Pictures are shared over the network automatically and cached.
+- **Alarms** (separate from chat; the **Alarms** button in the left rail, or *Alarms…* in the tray menu). Set a time, label, repeat days (or once) and two wave colors. When it rings, the screen waves in those colors every few seconds and an alarm card offers **Snooze 5 min** / **Dismiss**; the Windows alarm sound can loop too. Stops by itself after 5 minutes. Alarms ring while the app runs (also from the tray).
+- **GIFs and emoji stickers like Telegram.** GIFs play inline as silent loops (paused while the window is hidden). The **GIF** button has two tabs: **Emoji**, 24 built-in animated emoji stickers (sent small, without a bubble), and **Saved GIFs**: every GIF you send is saved there, right-click a received one → *Save GIF*, or *Add GIF…* from disk.
+
+The built-in animated emoji are [Noto Animated Emoji](https://googlefonts.github.io/noto-emoji-animation/) by Google, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), resized to 128 px (`tools/fetch-emoji.ps1` downloads them, `tools/ShrinkGifs.cs` resizes them).
 - **Screen ripple.** When a message arrives, two Material-style waves in the sender's two colors spread across the whole screen from the LED. Every message ripples, at most once every 3 s so a burst of messages doesn't flood the screen (configurable in Settings, or off). The overlay never blocks clicks or takes focus.
 - **Exit** only from the tray icon menu (or the LED's right-click menu).
 

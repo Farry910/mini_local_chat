@@ -50,6 +50,9 @@ public sealed class WireHeader
     /// <summary>Sender's two avatar colors ("#RRGGBB"), also used for the ripple on the receiver's screen.</summary>
     public List<string>? Colors { get; set; }
 
+    /// <summary>Sender's profile picture id (null = none). Receivers without it ask with "avatar-get".</summary>
+    public string? Avatar { get; set; }
+
     /// <summary>Set for group chats; shared by all members.</summary>
     public string? GroupId { get; set; }
 
@@ -74,6 +77,9 @@ public sealed class WireHeader
     /// <summary>"chat": a forwarded copy of another message.</summary>
     public bool Forwarded { get; set; }
 
+    /// <summary>"chat": a built-in emoji sticker (the GIF is the payload, the emoji is in Text).</summary>
+    public bool Sticker { get; set; }
+
     /// <summary>"edit" / "delete" / "react": the message acted on.</summary>
     public Guid? TargetId { get; set; }
 
@@ -95,6 +101,12 @@ public static class WireTypes
     public const string Delete = "delete";
     public const string React = "react";
     public const string Group = "group";
+
+    /// <summary>"Please send me your picture with id <c>Text</c>."</summary>
+    public const string AvatarGet = "avatar-get";
+
+    /// <summary>A profile picture (the file payload), id in <c>Text</c>.</summary>
+    public const string Avatar = "avatar";
 }
 
 public static class GroupActions
@@ -135,4 +147,7 @@ public sealed class PresencePacket
 
     /// <summary>Two avatar colors ("#RRGGBB").</summary>
     public List<string>? Colors { get; set; }
+
+    /// <summary>Profile picture id, or null.</summary>
+    public string? Avatar { get; set; }
 }

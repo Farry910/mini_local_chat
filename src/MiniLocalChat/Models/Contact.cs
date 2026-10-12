@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using System.Windows.Media;
 using MiniLocalChat.Infrastructure;
+using MiniLocalChat.Services;
 
 namespace MiniLocalChat.Models;
 
@@ -16,6 +17,7 @@ public sealed class Contact : ObservableObject
     private string? _color2;
     private bool _isOnline;
     private bool _rippleBlocked;
+    private string? _avatarId;
 
     public string Ip
     {
@@ -72,6 +74,26 @@ public sealed class Contact : ObservableObject
 
     public DateTime LastSeenUtc { get; set; }
 
+    /// <summary>The person's profile picture (hash of the image); null = initials. The image itself is cached by id.</summary>
+    public string? AvatarId
+    {
+        get => _avatarId;
+        set
+        {
+            if (Set(ref _avatarId, AvatarStore.IsValidId(value) ? value : null))
+            {
+                OnPropertyChanged(nameof(AvatarImage));
+            }
+        }
+    }
+
+    /// <summary>The picture, once it's on this computer; null shows initials on the first color.</summary>
+    [JsonIgnore]
+    public ImageSource? AvatarImage => AvatarStore.ImageFor(AvatarId);
+
+    /// <summary>Call when the picture for <see cref="AvatarId"/> has just arrived.</summary>
+    public void RefreshAvatar() => OnPropertyChanged(nameof(AvatarImage));
+
     /// <summary>
     /// My local choice: messages from this person never trigger the screen ripple (e.g. someone spamming).
     /// Their messages still arrive and light the LED. They aren't told.
@@ -104,14 +126,10 @@ public sealed class Contact : ObservableObject
     [JsonIgnore]
     public Brush AvatarBrush => AvatarPalette.ToBrush(EffectiveColor1);
 
-    [JsonIgnore]
-    public Brush RingBrush => AvatarPalette.ToBrush(EffectiveColor2);
-
     private void OnColorsChanged()
     {
         OnPropertyChanged(nameof(EffectiveColor1));
         OnPropertyChanged(nameof(EffectiveColor2));
         OnPropertyChanged(nameof(AvatarBrush));
-        OnPropertyChanged(nameof(RingBrush));
     }
 }

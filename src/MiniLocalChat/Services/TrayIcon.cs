@@ -11,11 +11,12 @@ public sealed class TrayIcon : IDisposable
     private readonly Icon _normal = AppIcons.CreateIcon(32, unreadDot: false);
     private readonly Icon _unread = AppIcons.CreateIcon(32, unreadDot: true);
 
-    public TrayIcon(Action open, Action settings, Action exit)
+    public TrayIcon(Action open, Action alarms, Action settings, Action exit)
     {
         var menu = new ContextMenuStrip();
         var openItem = menu.Items.Add("Open Mini Local Chat", null, (_, _) => open());
         openItem.Font = new Font(openItem.Font, System.Drawing.FontStyle.Bold);
+        menu.Items.Add("Alarms…", null, (_, _) => alarms());
         menu.Items.Add("Settings…", null, (_, _) => settings());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => exit());

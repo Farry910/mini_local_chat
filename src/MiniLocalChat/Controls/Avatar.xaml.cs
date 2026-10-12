@@ -9,7 +9,7 @@ public partial class Avatar : UserControl
 {
     public static readonly DependencyProperty TextProperty = Register(nameof(Text), typeof(string), "");
     public static readonly DependencyProperty FillProperty = Register(nameof(Fill), typeof(Brush), null);
-    public static readonly DependencyProperty RingProperty = Register(nameof(Ring), typeof(Brush), null);
+    public static readonly DependencyProperty ImageProperty = Register(nameof(Image), typeof(ImageSource), null);
     public static readonly DependencyProperty IsGroupProperty = Register(nameof(IsGroup), typeof(bool), false);
     public static readonly DependencyProperty ShowPresenceProperty = Register(nameof(ShowPresence), typeof(bool), false);
     public static readonly DependencyProperty IsOnlineProperty = Register(nameof(IsOnline), typeof(bool), false);
@@ -36,11 +36,11 @@ public partial class Avatar : UserControl
         set => SetValue(FillProperty, value);
     }
 
-    /// <summary>Second color, shown as a ring. Null = no ring.</summary>
-    public Brush? Ring
+    /// <summary>Profile picture; replaces the initials and the fill color.</summary>
+    public ImageSource? Image
     {
-        get => (Brush?)GetValue(RingProperty);
-        set => SetValue(RingProperty, value);
+        get => (ImageSource?)GetValue(ImageProperty);
+        set => SetValue(ImageProperty, value);
     }
 
     public bool IsGroup
@@ -74,11 +74,20 @@ public partial class Avatar : UserControl
 
     private void UpdateVisuals()
     {
-        Circle.Fill = Fill ?? OfflineBrush;
-        RingCircle.Stroke = Ring;
-        RingCircle.Visibility = Ring is null ? Visibility.Collapsed : Visibility.Visible;
+        var picture = IsGroup ? null : Image;
+        if (picture is not null)
+        {
+            var brush = new ImageBrush(picture) { Stretch = Stretch.UniformToFill };
+            brush.Freeze();
+            Circle.Fill = brush;
+        }
+        else
+        {
+            Circle.Fill = Fill ?? OfflineBrush;
+        }
+
         InitialsText.Text = Text;
-        InitialsText.Visibility = IsGroup ? Visibility.Collapsed : Visibility.Visible;
+        InitialsText.Visibility = IsGroup || picture is not null ? Visibility.Collapsed : Visibility.Visible;
         GroupGlyph.Visibility = IsGroup ? Visibility.Visible : Visibility.Collapsed;
         PresenceDot.Visibility = ShowPresence ? Visibility.Visible : Visibility.Collapsed;
         PresenceDot.Fill = IsOnline ? OnlineBrush : OfflineBrush;
@@ -93,7 +102,6 @@ public partial class Avatar : UserControl
             return;
         }
 
-        RingCircle.StrokeThickness = Math.Max(2, size * 0.1);
         InitialsText.FontSize = Math.Max(8, size * 0.36);
         GroupGlyph.FontSize = Math.Max(8, size * 0.45);
         PresenceDot.Width = PresenceDot.Height = Math.Max(9, size * 0.32);

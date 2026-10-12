@@ -1,0 +1,6 @@
+The animated emoji in this folder are Google's Noto Animated Emoji
+(https://googlefonts.github.io/noto-emoji-animation/), licensed under the
+Creative Commons Attribution 4.0 International License (CC BY 4.0,
+https://creativecommons.org/licenses/by/4.0/).
+
+Changes: resized from 512 px to 128 px and re-encoded (tools/ShrinkGifs.cs).

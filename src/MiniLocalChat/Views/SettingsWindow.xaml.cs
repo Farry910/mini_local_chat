@@ -13,6 +13,7 @@ public partial class SettingsWindow : Window
 {
     private readonly ChatService _chat = App.Chat;
     private readonly bool _welcome;
+    private string? _avatarId;
 
     private SettingsWindow(bool welcome)
     {
@@ -28,6 +29,7 @@ public partial class SettingsWindow : Window
         Color2List.ItemsSource = AvatarPalette.Choices;
         Color1List.SelectedItem = _chat.Me.EffectiveColor1;
         Color2List.SelectedItem = _chat.Me.EffectiveColor2;
+        _avatarId = _chat.Me.AvatarId;
         PreviewRippleButton.Visibility = App.Current.Ripples is null ? Visibility.Collapsed : Visibility.Visible;
         UpdateColorPreview();
 
@@ -117,7 +119,7 @@ public partial class SettingsWindow : Window
             }
         }
 
-        _chat.ApplyProfile(nickname, (IpCombo.SelectedItem as ComboBoxItem)?.Tag as string, SelectedColor1, SelectedColor2);
+        _chat.ApplyProfile(nickname, (IpCombo.SelectedItem as ComboBoxItem)?.Tag as string, SelectedColor1, SelectedColor2, _avatarId);
         DialogResult = true;
     }
 
@@ -135,9 +137,39 @@ public partial class SettingsWindow : Window
         }
 
         ColorPreview.Fill = AvatarPalette.ToBrush(SelectedColor1);
-        ColorPreview.Ring = AvatarPalette.ToBrush(SelectedColor2);
+        ColorPreview.Image = AvatarStore.ImageFor(_avatarId);
+        RemovePictureLink.Visibility = _avatarId is null ? Visibility.Collapsed : Visibility.Visible;
         var name = ChatService.CleanNickname(NicknameBox.Text);
         ColorPreview.Text = AvatarPalette.Initials(name.Length > 0 ? name : "?");
+    }
+
+    private void OnChoosePicture(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose your picture",
+            Filter = "Pictures|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp;*.tif;*.tiff|All files|*.*",
+        };
+        if (DialogGuard.Run(() => dialog.ShowDialog(this)) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            _avatarId = AvatarStore.Import(dialog.FileName);
+            UpdateColorPreview();
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or FileFormatException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "That file couldn't be opened as a picture.", "Choose picture", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnRemovePicture(object sender, RoutedEventArgs e)
+    {
+        _avatarId = null;
+        UpdateColorPreview();
     }
 
     private void OnPreviewRipple(object sender, RoutedEventArgs e) =>
@@ -152,6 +184,9 @@ public partial class SettingsWindow : Window
         FirewallResult.Foreground = ok ? (Brush)FindResource("AccentBrush") : Brushes.Firebrick;
         FirewallResult.Visibility = Visibility.Visible;
     }
+
+    private void OnOpenEmojiCredit(object sender, RoutedEventArgs e) =>
+        Process.Start(new ProcessStartInfo(EmojiStickers.CreditUrl) { UseShellExecute = true });
 
     private void OnOpenDataFolder(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo(AppPaths.DataDir) { UseShellExecute = true });

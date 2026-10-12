@@ -22,11 +22,14 @@ public partial class App : Application
     private MainWindow? _main;
     private FloatingController? _floating;
     private RippleController? _ripples;
+    private AlarmRinger? _alarmRinger;
     private TrayIcon? _tray;
     private Mutex? _instanceMutex;
     private EventWaitHandle? _showSignal;
 
     public static ChatService Chat { get; private set; } = null!;
+
+    public static AlarmService Alarms { get; private set; } = null!;
 
     public static bool IsExiting { get; private set; }
 
@@ -71,9 +74,13 @@ public partial class App : Application
             return;
         }
 
+        // Alarms are separate from chat; they ring (waving the screen) while the app runs, also from the tray.
+        Alarms = new AlarmService();
+        _alarmRinger = new AlarmRinger(Alarms, () => _ripples);
+
         _main = new MainWindow();
         _floating = new FloatingController();
-        _tray = new TrayIcon(() => ShowMain(), ShowSettings, ExitApp);
+        _tray = new TrayIcon(() => ShowMain(), ShowAlarms, ShowSettings, ExitApp);
         _tray.SetUnread(Chat.TotalUnread);
 
         Chat.IsConversationVisible = c => _main.IsShowing(c) || _floating.IsShowing(c);
@@ -145,6 +152,13 @@ public partial class App : Application
             _tray?.ShowBalloon("Mini Local Chat is still running",
                 "The LED at the edge of your screen glows green when messages arrive. Hover it to reply. To quit, right-click this icon and choose Exit.");
         }
+    }
+
+    /// <summary>Opens the main window on the Alarms page.</summary>
+    public void ShowAlarms()
+    {
+        ShowMain();
+        _main?.ShowPage(alarms: true);
     }
 
     public void ShowSettings()

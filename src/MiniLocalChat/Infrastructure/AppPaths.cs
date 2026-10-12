@@ -7,6 +7,12 @@ public static class AppPaths
     /// <summary>Received files and pasted images live here, one sub-folder per message.</summary>
     public static string FilesDir => Path.Combine(DataDir, "Files");
 
+    /// <summary>Profile pictures (mine and everyone's), named by content hash.</summary>
+    public static string AvatarsDir => Path.Combine(DataDir, "Avatars");
+
+    /// <summary>GIFs that were sent or saved, named by content hash; never deleted, since messages point at them.</summary>
+    public static string GifsDir => Path.Combine(FilesDir, "gifs");
+
     public static void Initialize(string? customDataDir)
     {
         DataDir = string.IsNullOrWhiteSpace(customDataDir)
@@ -15,6 +21,8 @@ public static class AppPaths
 
         Directory.CreateDirectory(DataDir);
         Directory.CreateDirectory(FilesDir);
+        Directory.CreateDirectory(AvatarsDir);
+        Directory.CreateDirectory(GifsDir);
     }
 }
 

@@ -25,6 +25,7 @@
     <i:BoolToVisibilityConverter x:Key="InverseBoolToVisibility" Invert="True" />
     <i:InverseBoolConverter x:Key="InverseBool" />
     <i:NotNullToVisibilityConverter x:Key="NotNullToVisibility" />
+    <i:PathToUriConverter x:Key="PathToUri" />
     <i:CountToVisibilityConverter x:Key="CountToVisibility" />
     <i:CountToVisibilityConverter x:Key="ZeroToVisibility" Invert="True" />
     <i:PositiveConverter x:Key="IsPositive" />
@@ -219,6 +220,56 @@
         <Setter Property="Margin" Value="0,14,0,6" />
     </Style>
 
+    <!-- A row of color swatches; the selected one gets a dark ring. -->
+    <Style x:Key="SwatchList" TargetType="ListBox">
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="8" />
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="ItemContainerStyle">
+            <Setter.Value>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                    <Setter Property="ToolTip" Value="{Binding}" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Grid Width="28" Height="28" Background="Transparent">
+                                    <Ellipse x:Name="Selection" Stroke="{StaticResource TextBrush}" StrokeThickness="2" Visibility="Hidden" />
+                                    <Ellipse Margin="4" Fill="{Binding}" />
+                                </Grid>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Selection" Property="Visibility" Value="Visible" />
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Selection" Property="Visibility" Value="Visible" />
+                                        <Setter TargetName="Selection" Property="Stroke" Value="#9E9E9E" />
+                                    </Trigger>
+                                    <MultiTrigger>
+                                        <MultiTrigger.Conditions>
+                                            <Condition Property="IsSelected" Value="True" />
+                                            <Condition Property="IsMouseOver" Value="True" />
+                                        </MultiTrigger.Conditions>
+                                        <Setter TargetName="Selection" Property="Stroke" Value="{StaticResource TextBrush}" />
+                                    </MultiTrigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Chat list -->
 
     <!-- Section header: "Favorites · 2", "Online · 5", "Offline · 3" -->
@@ -310,7 +361,7 @@
             </Grid.RowDefinitions>
 
             <c:Avatar Grid.RowSpan="2" Width="36" Height="36" Margin="0,0,10,0" VerticalAlignment="Center"
-                      Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" Ring="{Binding AvatarRing}" IsGroup="{Binding IsGroup}"
+                      Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" Image="{Binding AvatarImage}" IsGroup="{Binding IsGroup}"
                       ShowPresence="{Binding IsGroup, Converter={StaticResource InverseBool}}"
                       IsOnline="{Binding Peer.IsOnline, FallbackValue=False}" />
 

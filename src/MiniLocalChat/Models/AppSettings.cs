@@ -9,6 +9,9 @@ public sealed class AppSettings
 
     public string? AvatarColor2 { get; set; }
 
+    /// <summary>My profile picture (see AvatarStore); null = initials.</summary>
+    public string? AvatarId { get; set; }
+
     /// <summary>The IP that identifies me to others. Null means detect automatically.</summary>
     public string? MyIp { get; set; }
 

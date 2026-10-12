@@ -17,6 +17,16 @@ public sealed class BoolToVisibilityConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>File path → Uri, for the animated GIF player; null if the file is gone.</summary>
+public sealed class PathToUriConverter : IValueConverter
+{
+    public object? Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is string path && File.Exists(path) ? new Uri(path) : null;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Visible when the value is set (e.g. a message has a reply quote).</summary>
 public sealed class NotNullToVisibilityConverter : IValueConverter
 {

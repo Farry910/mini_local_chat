@@ -116,9 +116,9 @@ public sealed class Conversation : ObservableObject
     [JsonIgnore]
     public Brush AvatarBrush => !IsGroup && Peer is { } peer ? peer.AvatarBrush : AvatarPalette.ToBrush(AvatarPalette.DefaultColor1(Id));
 
-    /// <summary>The person's second color as a ring; groups have none.</summary>
+    /// <summary>The person's profile picture, if they set one.</summary>
     [JsonIgnore]
-    public Brush? AvatarRing => IsGroup ? null : Peer?.RingBrush;
+    public ImageSource? AvatarImage => IsGroup ? null : Peer?.AvatarImage;
 
     [JsonIgnore]
     public string LastPreview
@@ -160,7 +160,7 @@ public sealed class Conversation : ObservableObject
         OnPropertyChanged(nameof(Subtitle));
         OnPropertyChanged(nameof(AvatarText));
         OnPropertyChanged(nameof(AvatarBrush));
-        OnPropertyChanged(nameof(AvatarRing));
+        OnPropertyChanged(nameof(AvatarImage));
         OnPropertyChanged(nameof(LastPreview));
         RefreshPresence();
     }

@@ -4,8 +4,6 @@
              IsTabStop="False">
     <Grid>
         <Ellipse x:Name="Circle" />
-        <!-- The person's second color, drawn just inside the edge. -->
-        <Ellipse x:Name="RingCircle" Visibility="Collapsed" />
         <TextBlock x:Name="InitialsText" HorizontalAlignment="Center" VerticalAlignment="Center"
                    FontFamily="{StaticResource TextFont}" FontWeight="SemiBold" Foreground="White" />
         <TextBlock x:Name="GroupGlyph" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"

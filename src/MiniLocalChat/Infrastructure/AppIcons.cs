@@ -29,7 +29,8 @@ internal static class AppIcons
 
             using var bubble = new GraphicsPath { FillMode = FillMode.Winding };
             AddRoundedRect(bubble, new RectangleF(1 * s, 4 * s, 28 * s, 19 * s), 6 * s);
-            bubble.AddPolygon([new PointF(7 * s, 20 * s), new PointF(7 * s, 29 * s), new PointF(15 * s, 22 * s)]);
+            // Same winding direction as the bubble, so the overlap fills instead of cancelling out.
+            bubble.AddPolygon([new PointF(7 * s, 20 * s), new PointF(15 * s, 22 * s), new PointF(7 * s, 29 * s)]);
             using (var fill = new SolidBrush(Color.FromArgb(0x5B, 0x5F, 0xC7)))
             {
                 g.FillPath(fill, bubble);
