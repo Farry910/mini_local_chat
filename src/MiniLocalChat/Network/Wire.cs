@@ -102,6 +102,9 @@ public static class WireTypes
     public const string React = "react";
     public const string Group = "group";
 
+    /// <summary>"I've seen the chat up to message <c>TargetId</c>" (read receipt, the double tick).</summary>
+    public const string Seen = "seen";
+
     /// <summary>"Please send me your picture with id <c>Text</c>."</summary>
     public const string AvatarGet = "avatar-get";
 

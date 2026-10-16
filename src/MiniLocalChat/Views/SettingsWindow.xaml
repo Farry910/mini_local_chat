@@ -66,6 +66,19 @@
                 <TextBlock VerticalAlignment="Center" FontSize="13" Text="seconds" />
             </StackPanel>
             <TextBlock x:Name="RippleError" Margin="22,4,0,0" FontSize="12" Foreground="#C4314B" Visibility="Collapsed" />
+            <CheckBox x:Name="SkipFullScreenBox" Margin="22,8,0,0" VerticalContentAlignment="Center" FontSize="13"
+                      IsEnabled="{Binding IsChecked, ElementName=RippleBox}"
+                      Content="Not while a full-screen app is in front (games, videos, remote desktop)" />
+
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Show / hide shortcut" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" MinWidth="0" Padding="12,5"
+                        Content="None" ToolTip="No shortcut" Click="OnClearHotkey" />
+                <TextBox x:Name="HotkeyBox" Style="{StaticResource FieldTextBox}" IsReadOnly="True" IsReadOnlyCaretVisible="False"
+                         Cursor="Hand" PreviewKeyDown="OnHotkeyKeyDown" ToolTip="Click here, then press the keys you want" />
+            </DockPanel>
+            <TextBlock x:Name="HotkeyHint" Margin="0,4,0,0" FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource SubtleTextBrush}"
+                       Text="Works from anywhere: brings Mini Local Chat up, or back to the tray if it's already in front. Click the box and press a new combination." />
 
             <TextBlock Style="{StaticResource FieldLabel}" Text="Can't see other people?" />
             <DockPanel>

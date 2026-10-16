@@ -270,6 +270,35 @@
         </Setter>
     </Style>
 
+    <!-- Tabs (GIF panel, Alarms / Timers): text with an accent underline when selected -->
+    <Style x:Key="PanelTab" TargetType="RadioButton">
+        <Setter Property="Margin" Value="0,0,14,0" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <StackPanel Background="Transparent">
+                        <ContentPresenter Margin="2,2,2,4" />
+                        <Border x:Name="Underline" Height="2" CornerRadius="1" Background="{StaticResource AccentBrush}" Visibility="Hidden" />
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Chat list -->
 
     <!-- Section header: "Favorites · 2", "Online · 5", "Offline · 3" -->

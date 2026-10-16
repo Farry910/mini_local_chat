@@ -143,20 +143,19 @@ internal static class Win32
         return IntPtr.Zero;
     }
 
-    /// <summary>
-    /// True while the user shouldn't be interrupted: a full-screen app or game, presentation mode,
-    /// or the screen is locked / screensaver.
-    /// </summary>
-    public static bool IsUserBusy()
-    {
-        if (SHQueryUserNotificationState(out var state) != 0)
-        {
-            return false;
-        }
+    /// <summary>The screen is locked / screensaver, or Windows presentation mode is on: nobody should see a ripple.</summary>
+    public static bool IsAwayOrPresenting() => QueryUserState() is 1 or 4;
 
-        // 1 not present (locked), 2 busy (full screen), 3 Direct3D full screen, 4 presentation mode, 7 full-screen store app.
-        return state is 1 or 2 or 3 or 4 or 7;
-    }
+    /// <summary>
+    /// A full-screen app is in front (Chrome Remote Desktop or a video in full screen, a game…).
+    /// Ripples still show over these unless the user opted out.
+    /// </summary>
+    public static bool IsFullScreenAppRunning() => QueryUserState() is 2 or 3 or 7;
+
+    // 1 not present (locked), 2 busy (full screen), 3 Direct3D full screen, 4 presentation mode,
+    // 5 normal, 6 quiet time, 7 full-screen store app. 0 if unknown.
+    private static int QueryUserState() =>
+        SHQueryUserNotificationState(out var state) == 0 ? state : 0;
 
     [DllImport("shell32.dll")]
     private static extern int SHQueryUserNotificationState(out int state);

@@ -133,6 +133,7 @@ public sealed partial class ChatService
 
         message.MarkDeleted();
         entry.Conversation.RefreshPreview();
+        entry.Conversation.RefreshStatusMarkers();
 
         var header = NewHeader(WireTypes.Delete, entry.Conversation);
         header.TargetId = message.Id;

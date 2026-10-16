@@ -7,19 +7,21 @@ A Teams-style private chat for computers on the same local network (e.g. a `192.
 - **Teams-style messages.** Hover a message for quick reactions (👍 ❤️ 😆 😮 😢 😡) and ⋯ → Reply, Forward, Copy, Edit, Delete (edit/delete your own). Replies quote the original (click to jump to it); edits and deletes update for everyone. **Find in chat** with Ctrl+F.
 - **Group chats:** rename, add people, leave (others are told), or delete the chat from your list.
 - **Chat list sections:** Favorites, Online, Offline (☆ a chat to pin it), with search in both the full window and the floating panel.
-- **Offline delivery.** Messages to someone who is offline are queued and sent automatically when they come back online.
+- **Offline delivery.** Messages to someone who is offline are queued and sent automatically when they come back online. Your newest message shows **✓ Delivered**, then **✓✓ Seen** once they open the chat (in groups: *Seen by 2 of 3*).
 - **Tray + floating LED.** Closing the window hides it to the tray. A small LED sits at the left or right edge of the screen:
   - dark: nothing new
   - glowing green with a number: unread messages
-  - hover it: a mini panel lists only the chats with new messages, so you can read and reply without opening the app
+  - hover it: a mini panel lists only the chats with new messages, so you can read and reply without opening the app. **Pin** it (📌 in its header) to keep it open.
   - drag it up/down or to the other side; double-click it to open the full app
 - **Personal colors and picture.** Each user picks two colors in Settings (the first is the avatar background; both are their ripple colors) and optionally a profile picture, which replaces the initials. Pictures are shared over the network automatically and cached.
-- **Alarms** (separate from chat; the **Alarms** button in the left rail, or *Alarms…* in the tray menu). Set a time, label, repeat days (or once) and two wave colors. When it rings, the screen waves in those colors every few seconds and an alarm card offers **Snooze 5 min** / **Dismiss**; the Windows alarm sound can loop too. Stops by itself after 5 minutes. Alarms ring while the app runs (also from the tray).
+- **Alarms** (separate from chat; the **Alarms** button in the left rail, or *Alarms…* in the tray menu). Set a time, label, repeat days (or once) and two wave colors. When it rings, the screen waves in those colors every few seconds and an alarm card offers **Snooze 5 min** / **Dismiss**; the Windows alarm sound can loop too. Stops by itself after 5 minutes. Alarms ring while the app runs (also from the tray). The time is set with counter-style ▲▼ boxes (click, mouse wheel, arrow keys or type).
+- **Timers** (the *Timers* tab on the Alarms page). Set a duration (hours : minutes : seconds, or a preset like 5 min), start, pause, reset. At zero the screen waves like an alarm, with **Restart** / **Dismiss**.
 - **GIFs and emoji stickers like Telegram.** GIFs play inline as silent loops (paused while the window is hidden). The **GIF** button has two tabs: **Emoji**, 24 built-in animated emoji stickers (sent small, without a bubble), and **Saved GIFs**: every GIF you send is saved there, right-click a received one → *Save GIF*, or *Add GIF…* from disk.
+- **Screen ripple.** When a message arrives, two Material-style waves in the sender's two colors spread across the whole screen from the LED. Every message ripples, at most once every 3 s so a burst of messages doesn't flood the screen (configurable in Settings). The overlay never blocks clicks or takes focus, and also shows over full-screen apps such as Chrome Remote Desktop (Settings can skip full-screen apps instead). Turn all ripples off or on with **Ripples** in the left rail, the same signal-shaped button in the floating panel header, or the LED's right-click menu; block a single person with *Block ripples* in their chat.
+- **Show / hide shortcut:** Ctrl+Alt+M opens the full window from anywhere and hides it again (change it in Settings).
+- **Exit** only from the tray icon menu (or the LED's right-click menu).
 
 The built-in animated emoji are [Noto Animated Emoji](https://googlefonts.github.io/noto-emoji-animation/) by Google, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), resized to 128 px (`tools/fetch-emoji.ps1` downloads them, `tools/ShrinkGifs.cs` resizes them).
-- **Screen ripple.** When a message arrives, two Material-style waves in the sender's two colors spread across the whole screen from the LED. Every message ripples, at most once every 3 s so a burst of messages doesn't flood the screen (configurable in Settings, or off). The overlay never blocks clicks or takes focus.
-- **Exit** only from the tray icon menu (or the LED's right-click menu).
 
 ## Build & run
 

@@ -1,25 +1,26 @@
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using MiniLocalChat.Infrastructure;
 using MiniLocalChat.Models;
 
 namespace MiniLocalChat.Views;
 
-/// <summary>The card shown while an alarm rings: time, label, Snooze 5 min, Dismiss. Top center of the screen.</summary>
+/// <summary>The card shown while an alarm or timer rings. Top center of the screen; several stack downwards.</summary>
 public partial class AlarmRingWindow : Window
 {
-    public AlarmRingWindow(Alarm alarm, int stackIndex)
+    public AlarmRingWindow(RingRequest request, int stackIndex)
     {
         InitializeComponent();
         Icon = AppIcons.WindowIcon;
-        Alarm = alarm;
-        Title = $"Alarm – {alarm.Title}";
-        TimeText.Text = alarm.TimeText;
-        LabelText.Text = alarm.Title;
-        Color1Strip.Background = alarm.Brush1;
-        Color2Strip.Background = alarm.Brush2;
+        Request = request;
+        Title = $"{request.Heading} – {request.Title}";
+        TimeText.Text = request.Heading;
+        LabelText.Text = request.Title;
+        SecondaryButton.Content = request.SecondaryLabel;
+        Color1Strip.Background = AvatarPalette.ToBrush(AvatarPalette.NormalizeHex(request.Color1) ?? "#5B5FC7");
+        Color2Strip.Background = AvatarPalette.ToBrush(AvatarPalette.NormalizeHex(request.Color2) ?? "#22C55E");
 
-        // Top center of the main screen; several ringing alarms stack downwards.
         Loaded += (_, _) =>
         {
             var area = SystemParameters.WorkArea;
@@ -28,20 +29,18 @@ public partial class AlarmRingWindow : Window
         };
 
         // The bell swings while ringing.
-        BellSwing.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, new DoubleAnimation(-14, 14, TimeSpan.FromMilliseconds(180))
-        {
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-        });
+        var swing = new DoubleAnimation(-14, 14, TimeSpan.FromMilliseconds(180)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
+        Timeline.SetDesiredFrameRate(swing, 30);
+        BellSwing.BeginAnimation(RotateTransform.AngleProperty, swing);
     }
 
-    public event Action? Snoozed;
+    public event Action? SecondaryClicked;
 
     public event Action? Dismissed;
 
-    public Alarm Alarm { get; }
+    public RingRequest Request { get; }
 
-    private void OnSnooze(object sender, RoutedEventArgs e) => Snoozed?.Invoke();
+    private void OnSecondary(object sender, RoutedEventArgs e) => SecondaryClicked?.Invoke();
 
     private void OnDismiss(object sender, RoutedEventArgs e) => Dismissed?.Invoke();
 }

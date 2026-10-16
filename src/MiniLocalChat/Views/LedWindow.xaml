@@ -9,6 +9,7 @@
     <Window.ContextMenu>
         <ContextMenu>
             <MenuItem Header="Open Mini Local Chat" FontWeight="SemiBold" Click="OnOpenClick" />
+            <MenuItem x:Name="RippleMenuItem" Header="Screen ripples" IsCheckable="True" Click="OnToggleRipples" />
             <Separator />
             <MenuItem Header="Exit" Click="OnExitClick" />
         </ContextMenu>

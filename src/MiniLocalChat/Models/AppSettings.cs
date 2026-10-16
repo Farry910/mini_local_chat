@@ -36,6 +36,16 @@ public sealed class AppSettings
     /// <summary>Every message ripples, but at most once per this many seconds, so a burst gives a few ripples, not dozens.</summary>
     public int RippleMinGapSeconds { get; set; } = 3;
 
+    /// <summary>Opt-in: no ripples while a full-screen app is in front (games, videos). Off = ripple over everything,
+    /// including Chrome Remote Desktop in full screen.</summary>
+    public bool RippleSkipFullScreen { get; set; }
+
+    /// <summary>The floating panel stays open (doesn't hide when the mouse leaves).</summary>
+    public bool FloatingPinned { get; set; }
+
+    /// <summary>System-wide shortcut that shows / hides the app, e.g. "Ctrl+Alt+M". Empty = none.</summary>
+    public string Hotkey { get; set; } = "Ctrl+Alt+M";
+
     public bool TrayHintShown { get; set; }
 
     /// <summary>Group chats I left: their messages are ignored unless someone adds me back.</summary>

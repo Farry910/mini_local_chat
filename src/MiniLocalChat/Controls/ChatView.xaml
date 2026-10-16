@@ -225,8 +225,11 @@
                                 MaxWidth="{Binding BubbleMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}">
                             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource BubbleContentTemplate}" Focusable="False" />
                         </Border>
-                        <ContentControl x:Name="Toolbar" Content="{Binding}" ContentTemplate="{StaticResource MessageToolbarTemplate}" Focusable="False" Visibility="Collapsed"
-                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-24,-6,0" Panel.ZIndex="1" />
+                        <!-- Zero-size canvas: the hover bar floats over the message without changing its size. -->
+                        <Canvas Width="0" Height="0" HorizontalAlignment="Left" VerticalAlignment="Top" Panel.ZIndex="1">
+                            <ContentControl x:Name="Toolbar" Canvas.Left="-2" Canvas.Top="-26" Content="{Binding}"
+                                            ContentTemplate="{StaticResource MessageToolbarTemplate}" Focusable="False" Visibility="Collapsed" />
+                        </Canvas>
                     </Grid>
                     <ItemsControl Margin="0,3,0,0" ItemsSource="{Binding ReactionChips}" ItemTemplate="{StaticResource ReactionChipTemplate}"
                                   ItemsPanel="{StaticResource WrapRow}"
@@ -262,15 +265,30 @@
                             MaxWidth="{Binding BubbleMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}">
                         <ContentControl Content="{Binding}" ContentTemplate="{StaticResource BubbleContentTemplate}" Focusable="False" />
                     </Border>
-                    <ContentControl x:Name="Toolbar" Content="{Binding}" ContentTemplate="{StaticResource MessageToolbarTemplate}" Focusable="False" Visibility="Collapsed"
-                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-24,-6,0" Panel.ZIndex="1" />
+                    <!-- Zero-size canvas: the hover bar floats over the message without changing its size. -->
+                    <Canvas Width="0" Height="0" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="1">
+                        <ContentControl x:Name="Toolbar" Canvas.Right="-2" Canvas.Top="-26" Content="{Binding}"
+                                        ContentTemplate="{StaticResource MessageToolbarTemplate}" Focusable="False" Visibility="Collapsed" />
+                    </Canvas>
                 </Grid>
                 <ItemsControl Margin="0,3,0,0" HorizontalAlignment="Right" ItemsSource="{Binding ReactionChips}"
                               ItemTemplate="{StaticResource ReactionChipTemplate}" ItemsPanel="{StaticResource WrapRow}"
                               Visibility="{Binding ReactionChips.Count, Converter={StaticResource CountToVisibility}}" />
-                <TextBlock Margin="0,2,2,0" HorizontalAlignment="Right" FontSize="11" Foreground="{StaticResource SubtleTextBrush}"
-                           Text="{Binding DeliveryText}"
-                           Visibility="{Binding DeliveryText, Converter={StaticResource EmptyToCollapsed}}" />
+                <!-- ✓ Delivered / ✓✓ Seen: only under my newest message (and any not delivered yet) -->
+                <TextBlock Margin="0,2,2,0" HorizontalAlignment="Right" FontSize="11" Text="{Binding StatusText}"
+                           Visibility="{Binding StatusText, Converter={StaticResource EmptyToCollapsed}}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSeen}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </StackPanel>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsSticker}" Value="True">
@@ -333,34 +351,7 @@
             </Setter>
         </Style>
 
-        <!-- Tabs in the GIF panel: text with an accent underline when selected -->
-        <Style x:Key="PanelTab" TargetType="RadioButton">
-            <Setter Property="Margin" Value="0,0,14,0" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <StackPanel Background="Transparent">
-                            <ContentPresenter Margin="2,2,2,4" />
-                            <Border x:Name="Underline" Height="2" CornerRadius="1" Background="{StaticResource AccentBrush}" Visibility="Hidden" />
-                        </StackPanel>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
-                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-                                <Setter Property="FontWeight" Value="SemiBold" />
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+
 
         <!-- Star: hollow, or filled gold for favorites -->
         <Style x:Key="FavoriteGlyph" TargetType="TextBlock">

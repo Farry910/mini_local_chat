@@ -36,7 +36,7 @@
                     </StackPanel>
                 </DockPanel>
                 <StackPanel Margin="20,14,20,18" HorizontalAlignment="Right" Orientation="Horizontal">
-                    <Button Style="{StaticResource SecondaryButton}" Content="Snooze 5 min" Click="OnSnooze" />
+                    <Button x:Name="SecondaryButton" Style="{StaticResource SecondaryButton}" Content="Snooze 5 min" Click="OnSecondary" />
                     <Button Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" Content="Dismiss" Click="OnDismiss" />
                 </StackPanel>
             </StackPanel>

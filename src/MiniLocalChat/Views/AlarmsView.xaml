@@ -62,7 +62,67 @@
                 </Trigger>
             </DataTemplate.Triggers>
         </DataTemplate>
-    </UserControl.Resources>
+
+        <!-- Countdown timer card: big remaining time, progress line, play/pause, reset, delete -->
+        <DataTemplate x:Key="TimerCard" DataType="{x:Type m:TimerItem}">
+            <Border x:Name="Card" Margin="0,0,0,10" Padding="18,14" Background="White" CornerRadius="8"
+                    BorderBrush="{StaticResource DividerBrush}" BorderThickness="1" Cursor="Hand" MouseLeftButtonUp="OnEditTimer">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Margin="6,0,0,0" VerticalAlignment="Center" Style="{StaticResource IconButton}"
+                                Content="&#xE74D;" ToolTip="Delete timer" Click="OnDeleteTimer" />
+                        <Button DockPanel.Dock="Right" Margin="6,0,0,0" VerticalAlignment="Center" Style="{StaticResource IconButton}"
+                                Content="&#xE72C;" ToolTip="Reset" Click="OnResetTimer" />
+                        <Button x:Name="PlayPause" DockPanel.Dock="Right" Width="44" Height="44" VerticalAlignment="Center"
+                                Click="OnPlayPauseTimer" ToolTip="Start">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Grid>
+                                        <Ellipse x:Name="Circle" Fill="{StaticResource AccentBrush}" />
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Circle" Property="Fill" Value="{StaticResource AccentHoverBrush}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock x:Name="PlayGlyph" FontSize="16" FontFamily="{StaticResource IconFont}" Foreground="White" Text="&#xE768;" />
+                        </Button>
+                        <StackPanel DockPanel.Dock="Left" Margin="0,0,16,0" VerticalAlignment="Center">
+                            <Ellipse Width="14" Height="14" Fill="{Binding Brush1}" />
+                            <Ellipse Width="14" Height="14" Margin="0,4,0,0" Fill="{Binding Brush2}" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock x:Name="Remaining" FontSize="34" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
+                                       Typography.NumeralAlignment="Tabular" Text="{Binding RemainingText}" />
+                            <TextBlock FontSize="13" Foreground="{StaticResource TextBrush}" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Margin="0,2,0,0" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" Text="{Binding StateText}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <!-- Progress line in the timer's first color -->
+                    <Grid Height="4" Margin="0,12,0,0">
+                        <Border CornerRadius="2" Background="{StaticResource PaneBrush}" />
+                        <Border CornerRadius="2" Background="{Binding Brush1}" HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5">
+                            <Border.RenderTransform>
+                                <ScaleTransform ScaleX="{Binding Progress}" />
+                            </Border.RenderTransform>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                    <Setter TargetName="PlayGlyph" Property="Text" Value="&#xE769;" />
+                    <Setter TargetName="PlayPause" Property="ToolTip" Value="Pause" />
+                    <Setter TargetName="Remaining" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+                <Trigger SourceName="Card" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                </Trigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>    </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -70,31 +130,41 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border Padding="28,18" Background="White" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1">
+        <Border Padding="28,14,28,0" Background="White" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,0,1">
             <DockPanel>
-                <Button DockPanel.Dock="Right" VerticalAlignment="Center" Style="{StaticResource PrimaryButton}" Click="OnNewAlarm">
+                <Button x:Name="NewButton" DockPanel.Dock="Right" AutomationProperties.Name="{Binding Text, ElementName=NewButtonText}" VerticalAlignment="Center" Style="{StaticResource PrimaryButton}" Click="OnNew">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Margin="0,0,8,0" VerticalAlignment="Center" FontSize="12" FontFamily="{StaticResource IconFont}" Text="&#xE710;" />
-                        <TextBlock Text="New alarm" />
+                        <TextBlock x:Name="NewButtonText" Text="New alarm" />
                     </StackPanel>
                 </Button>
                 <StackPanel>
-                    <TextBlock FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextBrush}" Text="Alarms" />
-                    <TextBlock x:Name="NextSummary" Margin="0,2,0,0" FontSize="13" Foreground="{StaticResource SubtleTextBrush}" />
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="AlarmsTab" Style="{StaticResource PanelTab}" FontSize="18" Content="Alarms" IsChecked="True"
+                                     AutomationProperties.Name="Alarms tab" Checked="OnTabChanged" />
+                        <RadioButton x:Name="TimersTab" Style="{StaticResource PanelTab}" FontSize="18" Content="Timers"
+                                     AutomationProperties.Name="Timers tab" Checked="OnTabChanged" />
+                    </StackPanel>
+                    <TextBlock x:Name="NextSummary" Margin="0,4,0,12" FontSize="13" Foreground="{StaticResource SubtleTextBrush}" />
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="AlarmsPanel" Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <ItemsControl x:Name="AlarmList" Margin="28,18" MaxWidth="720" HorizontalAlignment="Stretch"
                           ItemTemplate="{StaticResource AlarmCard}" />
         </ScrollViewer>
 
+        <ScrollViewer x:Name="TimersPanel" Grid.Row="1" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+            <ItemsControl x:Name="TimerList" Margin="28,18" MaxWidth="720" HorizontalAlignment="Stretch"
+                          ItemTemplate="{StaticResource TimerCard}" />
+        </ScrollViewer>
+
         <StackPanel x:Name="EmptyState" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock HorizontalAlignment="Center" FontSize="48" FontFamily="{StaticResource IconFont}" Foreground="#C8C8E8" Text="&#xEA8F;" />
-            <TextBlock Margin="0,12,0,4" HorizontalAlignment="Center" FontSize="17" FontWeight="SemiBold"
+            <TextBlock x:Name="EmptyGlyph" HorizontalAlignment="Center" FontSize="48" FontFamily="{StaticResource IconFont}" Foreground="#C8C8E8" Text="&#xEA8F;" />
+            <TextBlock x:Name="EmptyTitle" Margin="0,12,0,4" HorizontalAlignment="Center" FontSize="17" FontWeight="SemiBold"
                        Foreground="{StaticResource TextBrush}" Text="No alarms yet" />
-            <TextBlock HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" FontSize="13"
+            <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" FontSize="13"
                        Foreground="{StaticResource SubtleTextBrush}"
                        Text="When an alarm rings, your screen waves in its colors until you snooze or dismiss it. Alarms ring while Mini Local Chat is running, also from the tray." />
         </StackPanel>

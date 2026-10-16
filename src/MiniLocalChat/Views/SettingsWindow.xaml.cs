@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using MiniLocalChat.Infrastructure;
 using MiniLocalChat.Models;
@@ -14,6 +15,7 @@ public partial class SettingsWindow : Window
     private readonly ChatService _chat = App.Chat;
     private readonly bool _welcome;
     private string? _avatarId;
+    private string _hotkey = "";
 
     private SettingsWindow(bool welcome)
     {
@@ -53,6 +55,9 @@ public partial class SettingsWindow : Window
         AutoStartBox.IsChecked = _chat.Settings.StartWithWindows;
         RippleBox.IsChecked = _chat.Settings.RippleEnabled;
         RippleGapBox.Text = _chat.Settings.RippleMinGapSeconds.ToString();
+        SkipFullScreenBox.IsChecked = _chat.Settings.RippleSkipFullScreen;
+        _hotkey = _chat.Settings.Hotkey;
+        HotkeyBox.Text = string.IsNullOrEmpty(_hotkey) ? "None" : _hotkey;
 
         if (welcome)
         {
@@ -108,7 +113,17 @@ public partial class SettingsWindow : Window
                 return;
             }
 
-            _chat.Settings.RippleEnabled = RippleBox.IsChecked == true;
+            if (_hotkey != _chat.Settings.Hotkey && !App.Current.ApplyHotkey(_hotkey, out var hotkeyError))
+            {
+                HotkeyHint.Text = hotkeyError;
+                HotkeyHint.Foreground = Brushes.Firebrick;
+                HotkeyBox.Focus();
+                return;
+            }
+
+            _chat.Settings.Hotkey = _hotkey;
+            _chat.SetRippleEnabled(RippleBox.IsChecked == true);
+            _chat.Settings.RippleSkipFullScreen = SkipFullScreenBox.IsChecked == true;
             _chat.Settings.RippleMinGapSeconds = gap;
             _chat.Settings.LedSide = LedLeft.IsChecked == true ? nameof(LedSide.Left) : nameof(LedSide.Right);
             var autoStart = AutoStartBox.IsChecked == true;
@@ -183,6 +198,37 @@ public partial class SettingsWindow : Window
             : "Not changed – the admin prompt was declined or Windows refused.";
         FirewallResult.Foreground = ok ? (Brush)FindResource("AccentBrush") : Brushes.Firebrick;
         FirewallResult.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Records the pressed combination, e.g. Ctrl+Alt+M (needs Ctrl, Alt or Win).</summary>
+    private void OnHotkeyKeyDown(object sender, KeyEventArgs e)
+    {
+        e.Handled = true;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift
+            or Key.LWin or Key.RWin or Key.Tab)
+        {
+            return;
+        }
+
+        var text = GlobalHotkey.Format(Keyboard.Modifiers, key);
+        if (!GlobalHotkey.TryParse(text, out _, out _))
+        {
+            HotkeyHint.Text = "Use Ctrl, Alt or Win together with a key, e.g. Ctrl+Alt+M.";
+            HotkeyHint.Foreground = Brushes.Firebrick;
+            return;
+        }
+
+        _hotkey = text;
+        HotkeyBox.Text = text;
+        HotkeyHint.Text = "Press Save to use it.";
+        HotkeyHint.Foreground = (Brush)FindResource("SubtleTextBrush");
+    }
+
+    private void OnClearHotkey(object sender, RoutedEventArgs e)
+    {
+        _hotkey = "";
+        HotkeyBox.Text = "None";
     }
 
     private void OnOpenEmojiCredit(object sender, RoutedEventArgs e) =>

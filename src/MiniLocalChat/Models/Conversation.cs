@@ -145,11 +145,28 @@ public sealed class Conversation : ObservableObject
         || Title.Contains(search, StringComparison.CurrentCultureIgnoreCase)
         || Members.Any(m => m.DisplayName.Contains(search, StringComparison.CurrentCultureIgnoreCase) || m.Ip.Contains(search));
 
+    /// <summary>The newest message from others that I've told them I've seen (so it isn't reported twice).</summary>
+    public Guid? LastSeenReported { get; set; }
+
     public void AddMessage(ChatMessage message)
     {
         Messages.Add(message);
         LastActivityUtc = DateTime.UtcNow;
         OnPropertyChanged(nameof(LastPreview));
+        RefreshStatusMarkers();
+    }
+
+    /// <summary>
+    /// Shows the delivery / seen line under my newest message only (Teams-style), plus under any of mine
+    /// that hasn't been delivered yet. Call when messages are added or their status changes.
+    /// </summary>
+    public void RefreshStatusMarkers()
+    {
+        var newestMine = Messages.LastOrDefault(m => m.IsMine && m.Kind != MessageKind.System && !m.IsDeleted);
+        foreach (var message in Messages)
+        {
+            message.ShowStatus = message.IsMine && (ReferenceEquals(message, newestMine) || (!message.IsDelivered && !message.IsDeleted));
+        }
     }
 
     /// <summary>Call when a member's nickname or colors, or the member list, change.</summary>

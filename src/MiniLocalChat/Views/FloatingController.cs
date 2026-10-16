@@ -49,6 +49,14 @@ public sealed class FloatingController
             _showTimer.Stop();
             HideMini();
         };
+        _led.Snapped += (_, _) =>
+        {
+            // A pinned panel follows the LED to its new place.
+            if (Pinned)
+            {
+                ShowMini(activate: false);
+            }
+        };
         _led.OpenRequested += (_, _) => App.Current.ShowMain();
         _led.ExitRequested += (_, _) => App.Current.ExitApp();
 
@@ -56,9 +64,24 @@ public sealed class FloatingController
         _mini.MouseLeave += (_, _) => _hideTimer.Start();
         _mini.Deactivated += (_, _) => _hideTimer.Start();
         _mini.OpenAppRequested += conversation => App.Current.ShowMain(conversation);
+        _mini.PinToggled += TogglePin;
     }
 
     public bool IsActive { get; private set; }
+
+    /// <summary>Pin mode: the panel stays open next to the LED instead of hiding when the mouse leaves.</summary>
+    public bool Pinned => App.Chat.Settings.FloatingPinned;
+
+    private void TogglePin()
+    {
+        App.Chat.Settings.FloatingPinned = !Pinned;
+        App.Chat.SaveSettings();
+        _mini.ShowPinned(Pinned);
+        if (!Pinned)
+        {
+            _hideTimer.Start();
+        }
+    }
 
     public bool IsShowing(Conversation conversation) => _mini.IsShowing(conversation);
 
@@ -69,6 +92,10 @@ public sealed class FloatingController
     {
         IsActive = true;
         _led.ShowAtSavedPosition();
+        if (Pinned)
+        {
+            ShowMini(activate: false);
+        }
     }
 
     public void Exit()
@@ -86,6 +113,10 @@ public sealed class FloatingController
         {
             HideMini();
             _led.PlaceFromSettings();
+            if (Pinned)
+            {
+                ShowMini(activate: false);
+            }
         }
     }
 
@@ -111,7 +142,7 @@ public sealed class FloatingController
 
     private void TryHideMini()
     {
-        if (DialogGuard.IsOpen || _led.IsMouseOver || _mini.IsMouseOver || _mini.IsActive)
+        if (Pinned || DialogGuard.IsOpen || _led.IsMouseOver || _mini.IsMouseOver || _mini.IsActive)
         {
             return;
         }

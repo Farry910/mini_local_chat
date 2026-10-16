@@ -1,0 +1,44 @@
+<UserControl x:Class="MiniLocalChat.Controls.NumberSpinner"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             IsTabStop="False">
+    <UserControl.Resources>
+        <Style x:Key="SpinButton" TargetType="RepeatButton">
+            <Setter Property="Height" Value="26" />
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Delay" Value="350" />
+            <Setter Property="Interval" Value="70" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentLightBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Width="72" Background="White" CornerRadius="8" BorderBrush="{StaticResource DividerBrush}" BorderThickness="1"
+            MouseWheel="OnWheel">
+        <StackPanel>
+            <RepeatButton Style="{StaticResource SpinButton}" Content="&#xE70E;" ToolTip="Up (↑ or mouse wheel)" Click="OnUp" />
+            <TextBox x:Name="Box" Margin="0,-2" Padding="0" FontSize="32" FontWeight="SemiBold" TextAlignment="Center"
+                     Foreground="{StaticResource TextBrush}" BorderThickness="0" Background="Transparent"
+                     Typography.NumeralAlignment="Tabular" MaxLength="2"
+                     PreviewTextInput="OnTextInput" PreviewKeyDown="OnKeyDown" LostKeyboardFocus="OnLostFocus" GotKeyboardFocus="OnGotFocus" />
+            <RepeatButton Style="{StaticResource SpinButton}" Content="&#xE70D;" ToolTip="Down (↓ or mouse wheel)" Click="OnDown" />
+        </StackPanel>
+    </Border>
+</UserControl>

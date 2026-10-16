@@ -22,12 +22,10 @@ public partial class AlarmEditWindow : Window
         Title = Heading.Text;
         DeleteButton.Visibility = isNew ? Visibility.Collapsed : Visibility.Visible;
 
-        HourBox.ItemsSource = Enumerable.Range(0, 24).Select(h => h.ToString("00")).ToList();
-        MinuteBox.ItemsSource = Enumerable.Range(0, 60).Select(m => m.ToString("00")).ToList();
-        HourBox.SelectedIndex = alarm.Hour;
-        MinuteBox.SelectedIndex = alarm.Minute;
-        HourBox.SelectionChanged += (_, _) => UpdateHints();
-        MinuteBox.SelectionChanged += (_, _) => UpdateHints();
+        HourSpinner.Value = alarm.Hour;
+        MinuteSpinner.Value = alarm.Minute;
+        HourSpinner.ValueChanged += (_, _) => UpdateHints();
+        MinuteSpinner.ValueChanged += (_, _) => UpdateHints();
         LabelBox.Text = alarm.Label;
 
         var names = CultureInfo.CurrentCulture.DateTimeFormat;
@@ -83,7 +81,7 @@ public partial class AlarmEditWindow : Window
 
     private void UpdateHints()
     {
-        var time = DateTime.Today.AddHours(HourBox.SelectedIndex).AddMinutes(MinuteBox.SelectedIndex);
+        var time = DateTime.Today.AddHours(HourSpinner.Value).AddMinutes(MinuteSpinner.Value);
         TimePreview.Text = time.ToString("t", CultureInfo.CurrentCulture);
         RepeatHint.Text = SelectedDays.Count == 0
             ? $"Rings once, {(time > DateTime.Now ? "today" : "tomorrow")}. Pick days to repeat it."
@@ -95,8 +93,8 @@ public partial class AlarmEditWindow : Window
 
     private void OnSave(object sender, RoutedEventArgs e)
     {
-        _alarm.Hour = HourBox.SelectedIndex;
-        _alarm.Minute = MinuteBox.SelectedIndex;
+        _alarm.Hour = HourSpinner.Value;
+        _alarm.Minute = MinuteSpinner.Value;
         _alarm.Label = LabelBox.Text.Trim();
         _alarm.Days = SelectedDays;
         _alarm.Color1 = (string)Color1List.SelectedItem;

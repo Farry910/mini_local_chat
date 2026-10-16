@@ -9,59 +9,120 @@ using MiniLocalChat.Services;
 
 namespace MiniLocalChat.Views;
 
-/// <summary>The Alarms page of the main window (separate from chat).</summary>
+/// <summary>The Alarms page of the main window (separate from chat): alarms and countdown timers.</summary>
 public partial class AlarmsView : UserControl
 {
     private readonly AlarmService _alarms = App.Alarms;
+    private readonly TimerService _timers = App.Timers;
 
     public AlarmsView()
     {
         InitializeComponent();
         AlarmList.ItemsSource = _alarms.Alarms;
-        _alarms.Alarms.CollectionChanged += OnAlarmsChanged;
+        TimerList.ItemsSource = _timers.Timers;
+        _alarms.Alarms.CollectionChanged += OnItemsChanged;
+        _timers.Timers.CollectionChanged += OnItemsChanged;
         foreach (var alarm in _alarms.Alarms)
         {
-            alarm.PropertyChanged += OnAlarmChanged;
+            alarm.PropertyChanged += OnItemChanged;
         }
 
-        UpdateSummary();
-    }
-
-    private void OnAlarmsChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        foreach (var alarm in e.NewItems?.OfType<Alarm>() ?? [])
+        foreach (var timer in _timers.Timers)
         {
-            alarm.PropertyChanged += OnAlarmChanged;
+            timer.PropertyChanged += OnItemChanged;
         }
 
-        UpdateSummary();
+        UpdatePage();
     }
 
-    private void OnAlarmChanged(object? sender, PropertyChangedEventArgs e)
+    private bool ShowingTimers => TimersTab.IsChecked == true;
+
+    /// <summary>Opens the Timers tab (e.g. from the tray).</summary>
+    public void ShowTimers() => TimersTab.IsChecked = true;
+
+    private void OnTabChanged(object sender, RoutedEventArgs e)
     {
-        if (e.PropertyName is nameof(Alarm.NextRing) or nameof(Alarm.Enabled) or nameof(Alarm.NextText))
+        if (IsInitialized)
         {
-            UpdateSummary();
+            UpdatePage();
         }
     }
 
-    private void UpdateSummary()
+    private void OnItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        EmptyState.Visibility = _alarms.Alarms.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        NextSummary.Text = _alarms.Next is { } next
-            ? $"Next alarm: {next.NextText}" + (string.IsNullOrWhiteSpace(next.Label) ? "" : $" · {next.Label}")
-            : _alarms.Alarms.Count == 0 ? "Wave your screen at a set time" : "No alarms are on";
+        foreach (var item in e.NewItems?.OfType<INotifyPropertyChanged>() ?? [])
+        {
+            item.PropertyChanged += OnItemChanged;
+        }
+
+        UpdatePage();
     }
 
-    private void OnNewAlarm(object sender, RoutedEventArgs e)
+    private void OnItemChanged(object? sender, PropertyChangedEventArgs e)
     {
-        var colors = App.Chat.Me;
-        var alarm = new Alarm { Color1 = colors.EffectiveColor1, Color2 = colors.EffectiveColor2 };
+        if (e.PropertyName is nameof(Alarm.NextRing) or nameof(Alarm.Enabled) or nameof(Alarm.NextText)
+            or nameof(TimerItem.State) or nameof(TimerItem.StateText))
+        {
+            UpdatePage();
+        }
+    }
+
+    private void UpdatePage()
+    {
+        var timers = ShowingTimers;
+        AlarmsPanel.Visibility = timers ? Visibility.Collapsed : Visibility.Visible;
+        TimersPanel.Visibility = timers ? Visibility.Visible : Visibility.Collapsed;
+        NewButtonText.Text = timers ? "New timer" : "New alarm";
+
+        if (timers)
+        {
+            var running = _timers.RunningCount;
+            NextSummary.Text = _timers.Timers.Count == 0 ? "Count down from a set time"
+                : running == 0 ? "No timers running"
+                : running == 1 ? "1 timer running" : $"{running} timers running";
+            EmptyState.Visibility = _timers.Timers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            EmptyGlyph.Text = "";
+            EmptyTitle.Text = "No timers yet";
+            EmptyText.Text = "Set a duration and start it. When it reaches zero, your screen waves in its colors until you restart or dismiss it.";
+        }
+        else
+        {
+            NextSummary.Text = _alarms.Next is { } next
+                ? $"Next alarm: {next.NextText}" + (string.IsNullOrWhiteSpace(next.Label) ? "" : $" · {next.Label}")
+                : _alarms.Alarms.Count == 0 ? "Wave your screen at a set time" : "No alarms are on";
+            EmptyState.Visibility = _alarms.Alarms.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            EmptyGlyph.Text = "";
+            EmptyTitle.Text = "No alarms yet";
+            EmptyText.Text = "When an alarm rings, your screen waves in its colors until you snooze or dismiss it. Alarms ring while Mini Local Chat is running, also from the tray.";
+        }
+    }
+
+    private void OnNew(object sender, RoutedEventArgs e)
+    {
+        var me = App.Chat.Me;
+        if (ShowingTimers)
+        {
+            var timer = new TimerItem { Color1 = me.EffectiveColor1, Color2 = me.EffectiveColor2 };
+            if (TimerEditWindow.Edit(Window.GetWindow(this), timer, isNew: true) is { } start)
+            {
+                _timers.Save(timer);
+                if (start)
+                {
+                    _timers.Start(timer);
+                }
+            }
+
+            return;
+        }
+
+        var alarm = new Alarm { Color1 = me.EffectiveColor1, Color2 = me.EffectiveColor2 };
         if (AlarmEditWindow.Edit(Window.GetWindow(this), alarm, isNew: true))
         {
             _alarms.Save(alarm);
         }
     }
+
+    // ---- Alarms ---------------------------------------------------------------------------------
 
     private void OnEditAlarm(object sender, MouseButtonEventArgs e)
     {
@@ -85,12 +146,67 @@ public partial class AlarmsView : UserControl
         if (sender is FrameworkElement { DataContext: Alarm alarm })
         {
             e.Handled = true;
-            var answer = DialogGuard.Run(() => MessageBox.Show(Window.GetWindow(this)!, $"Delete the {alarm.TimeText} alarm “{alarm.Title}”?",
-                "Delete alarm", MessageBoxButton.OKCancel, MessageBoxImage.Question));
-            if (answer == MessageBoxResult.OK)
+            if (Confirm($"Delete the {alarm.TimeText} alarm “{alarm.Title}”?", "Delete alarm"))
             {
                 _alarms.Delete(alarm);
             }
         }
     }
+
+    // ---- Timers ---------------------------------------------------------------------------------
+
+    private void OnPlayPauseTimer(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TimerItem timer })
+        {
+            e.Handled = true;
+            if (timer.State == TimerState.Running)
+            {
+                _timers.Pause(timer);
+            }
+            else
+            {
+                _timers.Start(timer);
+            }
+        }
+    }
+
+    private void OnResetTimer(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TimerItem timer })
+        {
+            e.Handled = true;
+            _timers.Reset(timer);
+        }
+    }
+
+    private void OnDeleteTimer(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TimerItem timer })
+        {
+            e.Handled = true;
+            if (Confirm($"Delete the {timer.DurationText} timer “{timer.Title}”?", "Delete timer"))
+            {
+                _timers.Delete(timer);
+            }
+        }
+    }
+
+    // Editing a running timer would change it under you, so only stopped or paused ones open the editor.
+    private void OnEditTimer(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TimerItem { State: not TimerState.Running } timer }
+            && TimerEditWindow.Edit(Window.GetWindow(this), timer, isNew: false) is { } start)
+        {
+            _timers.Save(timer);
+            if (start)
+            {
+                _timers.Start(timer);
+            }
+        }
+    }
+
+    private bool Confirm(string text, string title) =>
+        DialogGuard.Run(() => MessageBox.Show(Window.GetWindow(this)!, text, title, MessageBoxButton.OKCancel, MessageBoxImage.Question))
+        == MessageBoxResult.OK;
 }

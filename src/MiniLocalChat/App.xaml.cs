@@ -23,6 +23,7 @@ public partial class App : Application
     private FloatingController? _floating;
     private RippleController? _ripples;
     private AlarmRinger? _alarmRinger;
+    private GlobalHotkey? _hotkey;
     private TrayIcon? _tray;
     private Mutex? _instanceMutex;
     private EventWaitHandle? _showSignal;
@@ -30,6 +31,8 @@ public partial class App : Application
     public static ChatService Chat { get; private set; } = null!;
 
     public static AlarmService Alarms { get; private set; } = null!;
+
+    public static TimerService Timers { get; private set; } = null!;
 
     public static bool IsExiting { get; private set; }
 
@@ -76,7 +79,8 @@ public partial class App : Application
 
         // Alarms are separate from chat; they ring (waving the screen) while the app runs, also from the tray.
         Alarms = new AlarmService();
-        _alarmRinger = new AlarmRinger(Alarms, () => _ripples);
+        Timers = new TimerService();
+        _alarmRinger = new AlarmRinger(Alarms, Timers, () => _ripples);
 
         _main = new MainWindow();
         _floating = new FloatingController();
@@ -97,6 +101,14 @@ public partial class App : Application
         };
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += (_, _) => Dispatcher.BeginInvoke(() => _floating.ApplySettings());
 
+        // System-wide show / hide shortcut (default Ctrl+Alt+M).
+        _hotkey = new GlobalHotkey();
+        _hotkey.Pressed += ToggleMain;
+        if (!_hotkey.TrySet(Chat.Settings.Hotkey, out var hotkeyError))
+        {
+            Log.Error("Shortcut", new InvalidOperationException(hotkeyError));
+        }
+
         if (startInTray)
         {
             EnterTrayMode();
@@ -112,6 +124,37 @@ public partial class App : Application
         _showSignal?.Dispose();
         _instanceMutex?.Dispose();
         base.OnExit(e);
+    }
+
+    /// <summary>The show / hide shortcut: in front → back to the tray; hidden or behind other windows → bring it up.</summary>
+    public void ToggleMain()
+    {
+        if (_main is { IsVisible: true, IsActive: true } && _main.WindowState != WindowState.Minimized)
+        {
+            EnterTrayMode();
+        }
+        else
+        {
+            ShowMain();
+        }
+    }
+
+    /// <summary>Changes the show / hide shortcut; false (with a reason) if it can't be used.</summary>
+    public bool ApplyHotkey(string text, out string error)
+    {
+        error = "";
+        if (_hotkey is null)
+        {
+            return true;
+        }
+
+        if (_hotkey.TrySet(text, out error))
+        {
+            return true;
+        }
+
+        _hotkey.TrySet(Chat.Settings.Hotkey, out _); // keep the old one working
+        return false;
     }
 
     public void ShowMain(Conversation? open = null)
@@ -178,6 +221,7 @@ public partial class App : Application
         }
 
         IsExiting = true;
+        _hotkey?.Dispose();
         _floating?.Exit();
         Chat.Shutdown();
         _tray?.Dispose();

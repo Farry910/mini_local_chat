@@ -44,6 +44,18 @@
                         <TextBlock Margin="0,3,0,0" HorizontalAlignment="Center" FontSize="10" Text="Settings" />
                     </StackPanel>
                 </Button>
+                <!-- Global ripple switch (all senders) -->
+                <Button x:Name="RippleRailButton" AutomationProperties.Name="Ripples" DockPanel.Dock="Bottom" Style="{StaticResource RailButton}"
+                        Click="OnToggleRipples">
+                    <StackPanel>
+                        <Grid HorizontalAlignment="Center">
+                            <TextBlock FontSize="20" FontFamily="{StaticResource IconFont}" Text="&#xE701;" />
+                            <TextBlock x:Name="RippleOffMark" FontSize="20" FontFamily="{StaticResource IconFont}" Text="&#xE711;"
+                                       Foreground="#C4314B" Visibility="Collapsed" />
+                        </Grid>
+                        <TextBlock x:Name="RippleRailLabel" Margin="0,3,0,0" HorizontalAlignment="Center" FontSize="10" Text="Ripples" />
+                    </StackPanel>
+                </Button>
             </DockPanel>
         </Border>
 

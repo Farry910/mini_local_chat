@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using MiniLocalChat.Infrastructure;
 using MiniLocalChat.Models;
 using MiniLocalChat.Services;
@@ -26,6 +27,8 @@ public partial class MainWindow : Window
         ConversationList.ItemsSource = _conversations;
 
         Activated += (_, _) => MarkSelectedRead();
+        _chat.RippleSettingChanged += UpdateRippleButton;
+        UpdateRippleButton();
         StateChanged += (_, _) => MarkSelectedRead();
         InputBindings.Add(new KeyBinding(new RelayCommand(StartNewChat), Key.N, ModifierKeys.Control));
     }
@@ -88,6 +91,19 @@ public partial class MainWindow : Window
     }
 
     private void OnSettings(object sender, RoutedEventArgs e) => App.Current.ShowSettings();
+
+    private void OnToggleRipples(object sender, RoutedEventArgs e) => _chat.SetRippleEnabled(!_chat.Settings.RippleEnabled);
+
+    private void UpdateRippleButton()
+    {
+        var on = _chat.Settings.RippleEnabled;
+        RippleOffMark.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        RippleRailLabel.Text = on ? "Ripples" : "Ripples off";
+        RippleRailButton.Foreground = on ? (Brush)FindResource("SubtleTextBrush") : Brushes.Firebrick;
+        RippleRailButton.ToolTip = on
+            ? "Screen ripples are on. Click to turn them off for everyone."
+            : "Screen ripples are off. Click to turn them back on.";
+    }
 
     private void OnShowChat(object sender, RoutedEventArgs e) => ShowPage(alarms: false);
 

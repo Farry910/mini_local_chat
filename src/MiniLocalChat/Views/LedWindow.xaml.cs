@@ -59,6 +59,9 @@ public partial class LedWindow : Window
 
     public event EventHandler? DragStarted;
 
+    /// <summary>The LED was dropped and moved to its place at the screen edge.</summary>
+    public event EventHandler? Snapped;
+
     public event EventHandler? OpenRequested;
 
     public event EventHandler? ExitRequested;
@@ -110,6 +113,7 @@ public partial class LedWindow : Window
         settings.LedOffsetY = Top - area.Top;
         settings.LedScreen = ScreenAt(center)?.DeviceName;
         _chat.SaveSettings();
+        Snapped?.Invoke(this, EventArgs.Empty);
     }
 
     private double Scale => VisualTreeHelper.GetDpi(this).DpiScaleX;
@@ -278,6 +282,14 @@ public partial class LedWindow : Window
     private void OnOpenClick(object sender, RoutedEventArgs e) => OpenRequested?.Invoke(this, EventArgs.Empty);
 
     private void OnExitClick(object sender, RoutedEventArgs e) => ExitRequested?.Invoke(this, EventArgs.Empty);
+
+    private void OnToggleRipples(object sender, RoutedEventArgs e) => _chat.SetRippleEnabled(RippleMenuItem.IsChecked);
+
+    protected override void OnContextMenuOpening(System.Windows.Controls.ContextMenuEventArgs e)
+    {
+        RippleMenuItem.IsChecked = _chat.Settings.RippleEnabled;
+        base.OnContextMenuOpening(e);
+    }
 
     // ---- Brushes --------------------------------------------------------------------------------
 

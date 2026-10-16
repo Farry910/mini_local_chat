@@ -75,9 +75,11 @@ public sealed class RippleController
             return;
         }
 
-        // Don't sweep across a full-screen game or video, a presentation, or a locked screen,
-        // and respect Windows' "Animation effects" being turned off. The LED still lights up.
-        if (Win32.IsUserBusy() || !SystemParameters.ClientAreaAnimation)
+        // Not on a locked screen or during a presentation, and respect Windows' "Animation effects" being off.
+        // Full-screen apps (e.g. Chrome Remote Desktop) still get the ripple unless the user opted out.
+        // The LED lights up either way.
+        if (Win32.IsAwayOrPresenting() || !SystemParameters.ClientAreaAnimation
+            || (settings.RippleSkipFullScreen && Win32.IsFullScreenAppRunning()))
         {
             return;
         }

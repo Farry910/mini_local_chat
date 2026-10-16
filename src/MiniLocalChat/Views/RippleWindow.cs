@@ -63,6 +63,9 @@ public sealed class RippleWindow : Window
             Show();
         }
 
+        // Back on top of everything, including a full-screen window that came to the front since the last ripple.
+        Win32.KeepOnTop(this);
+
         // Big enough to cover the farthest corner of this monitor.
         var radius = new[] { new Point(0, 0), new Point(Width, 0), new Point(0, Height), new Point(Width, Height) }
             .Max(corner => (corner - origin).Length) + 60;

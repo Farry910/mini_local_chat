@@ -207,6 +207,21 @@ public sealed partial class ChatService : ObservableObject
         _presence?.Announce(PresenceKinds.Here);
     }
 
+    /// <summary>The global "ripples on/off" switch changed (from Settings, the rail, the floating panel or the LED menu).</summary>
+    public event Action? RippleSettingChanged;
+
+    public void SetRippleEnabled(bool enabled)
+    {
+        if (Settings.RippleEnabled == enabled)
+        {
+            return;
+        }
+
+        Settings.RippleEnabled = enabled;
+        SaveSettings();
+        RippleSettingChanged?.Invoke();
+    }
+
     public void SaveSettings()
     {
         try
@@ -298,6 +313,48 @@ public sealed partial class ChatService : ObservableObject
         {
             conversation.UnreadCount = 0;
             ScheduleSave();
+        }
+
+        ReportSeen(conversation);
+    }
+
+    /// <summary>
+    /// Read receipt: tells the others in the chat I've seen everything up to the newest message from them,
+    /// so their messages show "✓✓ Seen". Sent once per new message.
+    /// </summary>
+    private void ReportSeen(Conversation conversation)
+    {
+        var newest = conversation.Messages.LastOrDefault(m => !m.IsMine && m.Kind != MessageKind.System);
+        if (newest is null || conversation.LastSeenReported == newest.Id)
+        {
+            return;
+        }
+
+        conversation.LastSeenReported = newest.Id;
+        var header = NewHeader(WireTypes.Seen, conversation);
+        header.TargetId = newest.Id;
+        SendControl(header, Recipients(conversation));
+    }
+
+    private void ReceiveSeen(WireHeader header, Contact sender)
+    {
+        if (TargetOf(header, sender) is not { } entry)
+        {
+            return;
+        }
+
+        // Everything up to that message, in this chat, was seen by them.
+        var (conversation, target) = entry;
+        var last = conversation.Messages.IndexOf(target);
+        var changed = false;
+        for (var i = 0; i <= last; i++)
+        {
+            changed |= conversation.Messages[i].MarkSeenBy(sender.Ip);
+        }
+
+        if (changed)
+        {
+            conversation.RefreshStatusMarkers();
         }
     }
 
@@ -396,6 +453,10 @@ public sealed partial class ChatService : ObservableObject
         if (item.Message is { } message)
         {
             message.SetDelivery(item.RecipientIp, state);
+            if (_messageIndex.TryGetValue(message.Id, out var entry))
+            {
+                entry.Conversation.RefreshStatusMarkers();
+            }
         }
         else
         {
@@ -453,6 +514,9 @@ public sealed partial class ChatService : ObservableObject
             case WireTypes.Group:
                 ReceiveGroupChange(header, sender);
                 break;
+            case WireTypes.Seen:
+                ReceiveSeen(header, sender);
+                break;
             case WireTypes.AvatarGet:
                 ReceiveAvatarRequest(header, sender);
                 return true;
@@ -493,7 +557,11 @@ public sealed partial class ChatService : ObservableObject
         }
 
         AddToConversation(conversation, message);
-        if (!IsConversationVisible(conversation))
+        if (IsConversationVisible(conversation))
+        {
+            ReportSeen(conversation); // it's on screen right now
+        }
+        else
         {
             conversation.UnreadCount++;
         }
@@ -661,6 +729,7 @@ public sealed partial class ChatService : ObservableObject
             message.RefreshReactions(Me.Ip, NameOf);
         }
 
+        conversation.RefreshStatusMarkers();
         conversation.PropertyChanged += OnConversationPropertyChanged;
         _conversationsById[conversation.Id] = conversation;
         Conversations.Add(conversation);

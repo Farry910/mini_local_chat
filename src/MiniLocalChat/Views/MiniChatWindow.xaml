@@ -27,6 +27,17 @@
                                 ToolTip="Back to all chats" Visibility="Collapsed" Click="OnBack" />
                         <Button DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE8A7;"
                                 ToolTip="Open the full app" Click="OnOpenApp" />
+                        <!-- Pin: keep this panel open -->
+                        <Button x:Name="PinButton" DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE718;"
+                                AutomationProperties.Name="Pin" Click="OnTogglePin" />
+                        <!-- Global ripple switch -->
+                        <Button x:Name="RippleToggleButton" DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}"
+                                AutomationProperties.Name="Ripples" Click="OnToggleRipples">
+                            <Grid>
+                                <TextBlock Text="&#xE701;" />
+                                <TextBlock x:Name="RippleOffMark" Text="&#xE711;" Visibility="Collapsed" />
+                            </Grid>
+                        </Button>
                         <Button x:Name="NewMessageButton" DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE70F;"
                                 ToolTip="New message" Click="OnNewMessage" />
                         <Button x:Name="FindButton" DockPanel.Dock="Right" Style="{StaticResource HeaderIconButton}" Content="&#xE721;"

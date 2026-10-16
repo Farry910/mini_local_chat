@@ -45,6 +45,7 @@ public sealed class ChatMessage : ObservableObject
     private string? _localPath;
     private bool _isEdited;
     private bool _isDeleted;
+    private bool _showStatus;
 
     public Guid Id { get; set; }
 
@@ -147,6 +148,37 @@ public sealed class ChatMessage : ObservableObject
             _ => Text.ReplaceLineEndings(" "),
         };
 
+    /// <summary>For my own messages: who has opened the chat since this message arrived ("seen", double tick).</summary>
+    public List<string> SeenBy { get; set; } = [];
+
+    [JsonIgnore]
+    public bool IsSeen => IsMine && SeenBy.Any(Delivery.ContainsKey);
+
+    /// <summary>
+    /// Teams-style: the status line shows under my newest message only, plus any message still on its way.
+    /// Set by the conversation.
+    /// </summary>
+    [JsonIgnore]
+    public bool ShowStatus
+    {
+        get => _showStatus;
+        set
+        {
+            if (Set(ref _showStatus, value))
+            {
+                OnPropertyChanged(nameof(StatusText));
+            }
+        }
+    }
+
+    /// <summary>What the status line shows (empty when hidden).</summary>
+    [JsonIgnore]
+    public string StatusText => ShowStatus ? DeliveryText : "";
+
+    /// <summary>Delivered (✓) or not yet; not counting failures.</summary>
+    [JsonIgnore]
+    public bool IsDelivered => Delivery.Count > 0 && Delivery.Values.All(s => s == DeliveryState.Sent);
+
     [JsonIgnore]
     public string DeliveryText
     {
@@ -158,6 +190,17 @@ public sealed class ChatMessage : ObservableObject
             }
 
             var total = Delivery.Count;
+            var seen = SeenBy.Count(Delivery.ContainsKey);
+            if (seen == total)
+            {
+                return total == 1 ? "✓✓ Seen" : "✓✓ Seen by everyone";
+            }
+
+            if (seen > 0)
+            {
+                return $"✓✓ Seen by {seen} of {total}";
+            }
+
             var sent = Delivery.Values.Count(s => s == DeliveryState.Sent);
             var failed = Delivery.Values.Count(s => s == DeliveryState.Failed);
             if (sent == total)
@@ -179,7 +222,29 @@ public sealed class ChatMessage : ObservableObject
     public void SetDelivery(string ip, DeliveryState state)
     {
         Delivery[ip] = state;
+        OnStatusChanged();
+    }
+
+    /// <summary>The person opened the chat after this message arrived. Seeing it implies it was delivered.</summary>
+    public bool MarkSeenBy(string ip)
+    {
+        if (!IsMine || !Delivery.ContainsKey(ip) || SeenBy.Contains(ip))
+        {
+            return false;
+        }
+
+        SeenBy.Add(ip);
+        Delivery[ip] = DeliveryState.Sent;
+        OnStatusChanged();
+        return true;
+    }
+
+    private void OnStatusChanged()
+    {
         OnPropertyChanged(nameof(DeliveryText));
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(IsSeen));
+        OnPropertyChanged(nameof(IsDelivered));
     }
 
     public void MarkDeleted()
@@ -189,7 +254,7 @@ public sealed class ChatMessage : ObservableObject
         Reactions.Clear();
         ReactionChips.Clear();
         IsDeleted = true;
-        OnPropertyChanged(nameof(DeliveryText));
+        OnStatusChanged();
     }
 
     /// <summary>Adds or removes one person's reaction. Returns false if nothing changed.</summary>
