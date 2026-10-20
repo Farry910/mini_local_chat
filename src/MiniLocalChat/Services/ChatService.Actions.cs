@@ -32,6 +32,13 @@ public sealed partial class ChatService
             return;
         }
 
+        // A Telegram sticker file goes out as a sticker (and into my stickers), not as a file.
+        if (StickerLibrary.IsTgs(path) && StickerLibrary.Add(path) is { } stickerPath)
+        {
+            SendSticker(conversation, stickerPath);
+            return;
+        }
+
         // Like Telegram: GIFs I send go to my saved GIFs, and the message points at the stored copy.
         if (GifLibrary.IsGif(path))
         {
@@ -52,15 +59,21 @@ public sealed partial class ChatService
     }
 
     /// <summary>A built-in animated emoji, sent as a sticker (not added to saved GIFs).</summary>
-    public void SendSticker(Conversation conversation, EmojiSticker sticker)
+    public void SendSticker(Conversation conversation, EmojiSticker sticker) => SendSticker(conversation, sticker.Path, sticker.Emoji);
+
+    /// <summary>
+    /// A sticker: an animated emoji GIF, or a Telegram sticker (.tgs) from my stickers. Shown without a
+    /// bubble. <paramref name="emoji"/> is what chat previews show ("😂 Sticker").
+    /// </summary>
+    public void SendSticker(Conversation conversation, string path, string emoji = "")
     {
-        var info = new FileInfo(sticker.Path);
+        var info = new FileInfo(path);
         if (info.Exists)
         {
             Post(conversation, new ChatMessage
             {
                 Kind = MessageKind.Image,
-                Text = sticker.Emoji,
+                Text = emoji,
                 FileName = info.Name,
                 FileSize = info.Length,
                 LocalPath = info.FullName,

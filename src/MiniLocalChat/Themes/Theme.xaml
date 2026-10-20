@@ -397,7 +397,7 @@
             <c:Avatar Grid.RowSpan="2" Width="36" Height="36" Margin="0,0,10,0" VerticalAlignment="Center"
                       Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" Image="{Binding AvatarImage}" IsGroup="{Binding IsGroup}"
                       ShowPresence="{Binding IsGroup, Converter={StaticResource InverseBool}}"
-                      IsOnline="{Binding Peer.IsOnline, FallbackValue=False}" />
+                      IsOnline="{Binding Peer.IsOnline, FallbackValue=False}" IsAway="{Binding Peer.IsAway, FallbackValue=False}" />
 
             <DockPanel Grid.Column="1">
                 <!-- Ripples from this person are blocked. -->

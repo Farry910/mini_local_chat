@@ -63,6 +63,7 @@ public partial class ChatView : UserControl
     private bool _pinnedToBottom = true;
     private ListCollectionView? _savedGifs;
     private ListCollectionView? _stickers;
+    private ListCollectionView? _tgsStickers;
     private bool _restoringDraft;
     private Storyboard? _typingDots;
 
@@ -684,6 +685,11 @@ public partial class ChatView : UserControl
             AddItem(menu, "Save GIF", "", () => GifLibrary.Add(gifPath));
         }
 
+        if (message.IsTgs && message.LocalPath is { } stickerPath && File.Exists(stickerPath) && !StickerLibrary.Contains(stickerPath))
+        {
+            AddItem(menu, "Save sticker", "", () => StickerLibrary.Add(stickerPath));
+        }
+
         if (message.CanEdit || message.CanDelete)
         {
             menu.Items.Add(new Separator());
@@ -1039,6 +1045,11 @@ public partial class ChatView : UserControl
         {
             Filter = o => o is SavedGif gif && (GifQuery.Length == 0 || gif.Name.Contains(GifQuery, StringComparison.CurrentCultureIgnoreCase)),
         };
+        _tgsStickers = new ListCollectionView(StickerLibrary.Items)
+        {
+            Filter = o => o is SavedSticker s && (GifQuery.Length == 0 || s.Name.Contains(GifQuery, StringComparison.CurrentCultureIgnoreCase)),
+        };
+        TgsGrid.ItemsSource = _tgsStickers;
         StickerGrid.ItemsSource = _stickers;
         GifGrid.ItemsSource = _savedGifs;
         UpdateGifTab();
@@ -1048,8 +1059,10 @@ public partial class ChatView : UserControl
     // Dropping the tiles stops their animations while the panel is closed.
     private void OnGifPanelClosed(object? sender, EventArgs e)
     {
+        TgsGrid.ItemsSource = null;
         StickerGrid.ItemsSource = null;
         GifGrid.ItemsSource = null;
+        _tgsStickers = null;
         _stickers = null;
         _savedGifs = null;
     }
@@ -1064,6 +1077,7 @@ public partial class ChatView : UserControl
 
     private void OnGifFilterChanged(object sender, TextChangedEventArgs e)
     {
+        _tgsStickers?.Refresh();
         _stickers?.Refresh();
         _savedGifs?.Refresh();
         UpdateGifTab();
@@ -1071,16 +1085,20 @@ public partial class ChatView : UserControl
 
     private void UpdateGifTab()
     {
+        var stickers = StickersTab.IsChecked == true;
         var emoji = EmojiTab.IsChecked == true;
+        TgsGrid.Visibility = stickers ? Visibility.Visible : Visibility.Collapsed;
         StickerGrid.Visibility = emoji ? Visibility.Visible : Visibility.Collapsed;
-        GifGrid.Visibility = emoji ? Visibility.Collapsed : Visibility.Visible;
+        GifGrid.Visibility = !stickers && !emoji ? Visibility.Visible : Visibility.Collapsed;
         AddGifButton.Visibility = emoji ? Visibility.Collapsed : Visibility.Visible;
+        AddGifButton.Content = stickers ? "Add sticker…" : "Add GIF…";
         StickerCredit.Visibility = emoji ? Visibility.Visible : Visibility.Collapsed;
-        GifFilterHint.Text = emoji ? "Search emoji" : "Search saved GIFs";
+        GifFilterHint.Text = stickers ? "Search stickers" : emoji ? "Search emoji" : "Search saved GIFs";
 
-        var view = emoji ? _stickers : _savedGifs;
+        var view = stickers ? _tgsStickers : emoji ? _stickers : _savedGifs;
         GifEmpty.Visibility = view is { IsEmpty: true } ? Visibility.Visible : Visibility.Collapsed;
-        GifEmpty.Text = emoji ? "No emoji match."
+        GifEmpty.Text = stickers ? "No stickers match."
+            : emoji ? "No emoji match."
             : GifLibrary.Items.Count == 0 ? "No saved GIFs yet. GIFs you send are saved here automatically, or use “Add GIF…”."
             : "No saved GIFs match.";
     }
@@ -1092,6 +1110,26 @@ public partial class ChatView : UserControl
             GifToggle.IsChecked = false;
             App.Chat.SendSticker(conversation, sticker);
             FocusInput();
+        }
+    }
+
+    private void OnTgsStickerPicked(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: SavedSticker sticker } && Conversation is { } conversation)
+        {
+            GifToggle.IsChecked = false;
+            App.Chat.SendSticker(conversation, sticker.Path);
+            FocusInput();
+        }
+    }
+
+    private void OnRemoveTgsSticker(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: SavedSticker sticker })
+        {
+            e.Handled = true;
+            StickerLibrary.Remove(sticker);
+            UpdateGifTab();
         }
     }
 
@@ -1133,6 +1171,12 @@ public partial class ChatView : UserControl
 
     private void OnAddGif(object sender, RoutedEventArgs e)
     {
+        if (StickersTab.IsChecked == true)
+        {
+            AddStickers();
+            return;
+        }
+
         var dialog = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = "Add GIFs", Filter = "GIF animations|*.gif" };
         if (DialogGuard.Run(() => dialog.ShowDialog(Window.GetWindow(this))) == true)
         {
@@ -1150,6 +1194,41 @@ public partial class ChatView : UserControl
         }
 
         // The file dialog closed the panel; bring it back with the new GIFs on top.
+        GifToggle.IsChecked = true;
+    }
+
+    /// <summary>Telegram sticker files (.tgs), e.g. downloaded from Telegram; anything that isn't one is skipped.</summary>
+    private void AddStickers()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = "Add stickers", Filter = "Telegram stickers|*.tgs" };
+        if (DialogGuard.Run(() => dialog.ShowDialog(Window.GetWindow(this))) == true)
+        {
+            var skipped = new List<string>();
+            foreach (var file in dialog.FileNames)
+            {
+                try
+                {
+                    if (StickerLibrary.Add(file) is null)
+                    {
+                        skipped.Add(System.IO.Path.GetFileName(file));
+                    }
+                }
+                catch (IOException ex)
+                {
+                    Log.Error("Adding sticker", ex);
+                    skipped.Add(System.IO.Path.GetFileName(file));
+                }
+            }
+
+            if (skipped.Count > 0)
+            {
+                DialogGuard.Run(() => MessageBox.Show(Window.GetWindow(this)!,
+                    "These aren't Telegram animated stickers, so they weren't added:\n" + string.Join("\n", skipped),
+                    "Add stickers", MessageBoxButton.OK, MessageBoxImage.Information));
+            }
+        }
+
+        // The file dialog closed the panel; bring it back with the new stickers.
         GifToggle.IsChecked = true;
     }
 

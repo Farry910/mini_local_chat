@@ -156,4 +156,7 @@ public sealed class PresencePacket
 
     /// <summary>Profile picture id, or null.</summary>
     public string? Avatar { get; set; }
+
+    /// <summary>Running but away: no mouse movement for a while, or the screen is locked.</summary>
+    public bool Away { get; set; }
 }

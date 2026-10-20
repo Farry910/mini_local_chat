@@ -28,6 +28,10 @@
                        MaxWidth="{Binding ImageMaxWidth, RelativeSource={RelativeSource AncestorType=c:ChatView}}"
                        gif:AnimationBehavior.RepeatBehavior="Forever" gif:AnimationBehavior.Error="OnGifError" />
 
+                <!-- Telegram animated sticker (.tgs). Its path is only set for those (trigger below). -->
+                <c:StickerPlayer x:Name="TgsPart" Width="160" Height="160" Visibility="Collapsed" Cursor="Hand"
+                                 ToolTip="{Binding Text}" />
+
                 <Grid x:Name="FilePart" Visibility="Collapsed" MinWidth="190">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -74,6 +78,12 @@
                     <Setter TargetName="GifPart" Property="MaxHeight" Value="128" />
                     <Setter TargetName="GifPart" Property="ToolTip" Value="{Binding Text}" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding IsTgs}" Value="True">
+                    <Setter TargetName="ImagePart" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="ImagePart" Property="Source" Value="{x:Null}" />
+                    <Setter TargetName="TgsPart" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="TgsPart" Property="Path" Value="{Binding LocalPath}" />
+                </DataTrigger>
                 <!-- Last, so it wins over the kind triggers. -->
                 <DataTrigger Binding="{Binding IsDeleted}" Value="True">
                     <Setter TargetName="TextPart" Property="Visibility" Value="Visible" />
@@ -82,6 +92,7 @@
                     <Setter TargetName="TextPart" Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
                     <Setter TargetName="ImagePart" Property="Visibility" Value="Collapsed" />
                     <Setter TargetName="GifPart" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="TgsPart" Property="Visibility" Value="Collapsed" />
                     <Setter TargetName="FilePart" Property="Visibility" Value="Collapsed" />
                 </DataTrigger>
             </DataTemplate.Triggers>
@@ -219,7 +230,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <c:Avatar Width="32" Height="32" Margin="0,2,10,0" VerticalAlignment="Top"
-                          Text="{Binding Sender.Initials}" Fill="{Binding Sender.AvatarBrush}" Image="{Binding Sender.AvatarImage}"
+                          Text="{Binding Sender.Initials}" Fill="{Binding Sender.AvatarBrush}" Image="{Binding Sender.AvatarImage}" Person="{Binding Sender}"
                           Visibility="{Binding IsCompact, RelativeSource={RelativeSource AncestorType=c:ChatView}, Converter={StaticResource InverseBoolToVisibility}}" />
                 <StackPanel Grid.Column="1">
                     <StackPanel Margin="0,0,0,3" Orientation="Horizontal">
@@ -402,14 +413,15 @@
                     <c:Avatar Width="36" Height="36" Margin="0,0,12,0"
                               Text="{Binding AvatarText}" Fill="{Binding AvatarBrush}" Image="{Binding AvatarImage}" IsGroup="{Binding IsGroup}"
                               ShowPresence="{Binding IsGroup, Converter={StaticResource InverseBool}}"
-                              IsOnline="{Binding Peer.IsOnline, FallbackValue=False}" />
+                              IsOnline="{Binding Peer.IsOnline, FallbackValue=False}" IsAway="{Binding Peer.IsAway, FallbackValue=False}"
+                              Person="{Binding Peer}" ToolTip="{Binding Peer.DisplayName}" />
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
                                    Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
                         <!-- 1:1: presence + IP. Group: member list. -->
                         <TextBlock FontSize="12" Foreground="{StaticResource SubtleTextBrush}" TextTrimming="CharacterEllipsis"
                                    Visibility="{Binding IsGroup, Converter={StaticResource InverseBoolToVisibility}}">
-                            <Run Text="{Binding Peer.IsOnline, Mode=OneWay, Converter={StaticResource PresenceText}, FallbackValue=''}" />
+                            <Run Text="{Binding Peer.PresenceText, Mode=OneWay, FallbackValue=''}" />
                             <Run Text="·" />
                             <Run Text="{Binding Subtitle, Mode=OneWay}" />
                         </TextBlock>
@@ -602,7 +614,8 @@
                                 BorderBrush="{StaticResource DividerBrush}" BorderThickness="1" CornerRadius="6">
                             <DockPanel Margin="8">
                                 <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8" Orientation="Horizontal">
-                                    <RadioButton x:Name="EmojiTab" Style="{StaticResource PanelTab}" Content="Emoji" IsChecked="True" Checked="OnGifTabChanged" />
+                                    <RadioButton x:Name="StickersTab" Style="{StaticResource PanelTab}" Content="Stickers" IsChecked="True" Checked="OnGifTabChanged" />
+                                    <RadioButton x:Name="EmojiTab" Style="{StaticResource PanelTab}" Content="Emoji" Checked="OnGifTabChanged" />
                                     <RadioButton x:Name="SavedTab" Style="{StaticResource PanelTab}" Content="Saved GIFs" Checked="OnGifTabChanged" />
                                 </StackPanel>
                                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -622,8 +635,44 @@
                                 <Grid>
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <Grid>
+                                            <!-- Telegram stickers (.tgs): built-in, sent, saved or added -->
+                                            <ItemsControl x:Name="TgsGrid">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type s:SavedSticker}">
+                                                        <Border x:Name="Tile" Width="76" Height="76" Margin="2" Padding="4" CornerRadius="6"
+                                                                Background="Transparent" Cursor="Hand" ToolTip="{Binding Name}"
+                                                                MouseLeftButtonUp="OnTgsStickerPicked">
+                                                            <Grid>
+                                                                <c:StickerPlayer Width="68" Height="68" PlayOnHover="True" Path="{Binding Path}" />
+                                                                <Button x:Name="RemoveButton" Width="20" Height="20" FontSize="9"
+                                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Background="#CCFFFFFF"
+                                                                        Style="{StaticResource IconButton}" Content="&#xE711;"
+                                                                        ToolTip="Remove from my stickers" Visibility="Collapsed" Click="OnRemoveTgsSticker" />
+                                                            </Grid>
+                                                        </Border>
+                                                        <DataTemplate.Triggers>
+                                                            <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Tile" Property="Background" Value="{StaticResource AccentLightBrush}" />
+                                                            </Trigger>
+                                                            <MultiDataTrigger>
+                                                                <MultiDataTrigger.Conditions>
+                                                                    <Condition Binding="{Binding IsMouseOver, ElementName=Tile}" Value="True" />
+                                                                    <Condition Binding="{Binding CanRemove}" Value="True" />
+                                                                </MultiDataTrigger.Conditions>
+                                                                <Setter TargetName="RemoveButton" Property="Visibility" Value="Visible" />
+                                                            </MultiDataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
                                             <!-- Built-in animated emoji -->
-                                            <ItemsControl x:Name="StickerGrid">
+                                            <ItemsControl x:Name="StickerGrid" Visibility="Collapsed">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate>
                                                         <WrapPanel />

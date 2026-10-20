@@ -144,6 +144,10 @@ public sealed class ChatMessage : ObservableObject
         && (string.Equals(Path.GetExtension(FileName), ".gif", StringComparison.OrdinalIgnoreCase)
             || string.Equals(Path.GetExtension(LocalPath), ".gif", StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>A Telegram animated sticker (.tgs, a Lottie animation).</summary>
+    [JsonIgnore]
+    public bool IsTgs => IsSticker && Services.StickerLibrary.IsTgs(LocalPath ?? FileName);
+
     /// <summary>Reply, forward, react…: not for deleted messages or system lines.</summary>
     [JsonIgnore]
     public bool HasActions => Kind != MessageKind.System && !IsDeleted;
@@ -153,7 +157,7 @@ public sealed class ChatMessage : ObservableObject
         ? "This message has been deleted"
         : Kind switch
         {
-            MessageKind.Image when IsSticker => $"{Text} Sticker",
+            MessageKind.Image when IsSticker => string.IsNullOrWhiteSpace(Text) ? "Sticker" : $"{Text} Sticker",
             MessageKind.Image when IsGif => "GIF",
             MessageKind.Image => "📷 Image",
             MessageKind.File => "📎 " + FileName,

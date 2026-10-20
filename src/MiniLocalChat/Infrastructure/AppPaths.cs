@@ -13,6 +13,9 @@ public static class AppPaths
     /// <summary>GIFs that were sent or saved, named by content hash; never deleted, since messages point at them.</summary>
     public static string GifsDir => Path.Combine(FilesDir, "gifs");
 
+    /// <summary>Telegram stickers (.tgs) that were sent, saved or built in, named by content hash; never deleted.</summary>
+    public static string StickersDir => Path.Combine(FilesDir, "stickers");
+
     public static void Initialize(string? customDataDir)
     {
         DataDir = string.IsNullOrWhiteSpace(customDataDir)
@@ -23,6 +26,7 @@ public static class AppPaths
         Directory.CreateDirectory(FilesDir);
         Directory.CreateDirectory(AvatarsDir);
         Directory.CreateDirectory(GifsDir);
+        Directory.CreateDirectory(StickersDir);
     }
 }
 

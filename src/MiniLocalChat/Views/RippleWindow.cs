@@ -11,6 +11,7 @@ namespace MiniLocalChat.Views;
 /// Transparent, click-through overlay covering one monitor. Plays a Material (MUI) style ripple:
 /// two translucent filled waves in the sender's two colors, spreading out from a point (the LED)
 /// one right after the other, then fading. Hides itself when done and is reused for the next ripple.
+/// A small window can also play a small, quick ripple (the unread reminder at the mouse pointer).
 /// </summary>
 public sealed class RippleWindow : Window
 {
@@ -18,6 +19,13 @@ public sealed class RippleWindow : Window
     private static readonly TimeSpan FadeStart = TimeSpan.FromMilliseconds(550);
     private static readonly TimeSpan FadeEnd = TimeSpan.FromMilliseconds(1300);
     private static readonly TimeSpan SecondWaveDelay = TimeSpan.FromMilliseconds(300);
+
+    // The small reminder ripple: quicker, and a touch stronger so it's noticed at that size.
+    private const double SmallRadius = 64;
+    private static readonly TimeSpan SmallExpandDuration = TimeSpan.FromMilliseconds(650);
+    private static readonly TimeSpan SmallFadeStart = TimeSpan.FromMilliseconds(300);
+    private static readonly TimeSpan SmallFadeEnd = TimeSpan.FromMilliseconds(900);
+    private static readonly TimeSpan SmallSecondWaveDelay = TimeSpan.FromMilliseconds(170);
 
     // MUI's ripple easing: cubic-bezier(0.4, 0, 0.2, 1).
     private static readonly KeySpline MuiEasing = new(0.4, 0, 0.2, 1);
@@ -51,10 +59,21 @@ public sealed class RippleWindow : Window
     }
 
     /// <summary>The monitor area this overlay covers, in DIPs.</summary>
-    public Rect Bounds { get; }
+    public Rect Bounds { get; private set; }
+
+    /// <summary>Moves the overlay (the small reminder window follows the mouse pointer).</summary>
+    public void MoveTo(Rect bounds)
+    {
+        Bounds = bounds;
+        Left = bounds.Left;
+        Top = bounds.Top;
+        Width = bounds.Width;
+        Height = bounds.Height;
+    }
 
     /// <param name="origin">Wave center, in this window's coordinates (may lie outside it, on another monitor).</param>
-    public void Play(Point origin, Color first, Color second)
+    /// <param name="small">The small, quick reminder ripple instead of the full-screen one.</param>
+    public void Play(Point origin, Color first, Color second, bool small = false)
     {
         var playId = ++_playId;
         _canvas.Children.Clear();
@@ -67,11 +86,12 @@ public sealed class RippleWindow : Window
         Win32.KeepOnTop(this);
 
         // Big enough to cover the farthest corner of this monitor.
-        var radius = new[] { new Point(0, 0), new Point(Width, 0), new Point(0, Height), new Point(Width, Height) }
-            .Max(corner => (corner - origin).Length) + 60;
+        var radius = small ? SmallRadius
+            : new[] { new Point(0, 0), new Point(Width, 0), new Point(0, Height), new Point(Width, Height) }
+                .Max(corner => (corner - origin).Length) + 60;
 
-        AddWave(origin, radius, first, TimeSpan.Zero, onDone: null);
-        AddWave(origin, radius, second, SecondWaveDelay, onDone: () =>
+        AddWave(origin, radius, first, TimeSpan.Zero, small, onDone: null);
+        AddWave(origin, radius, second, small ? SmallSecondWaveDelay : SecondWaveDelay, small, onDone: () =>
         {
             // A newer ripple may have started on this window in the meantime.
             if (playId == _playId)
@@ -82,14 +102,14 @@ public sealed class RippleWindow : Window
         });
     }
 
-    private void AddWave(Point origin, double radius, Color color, TimeSpan delay, Action? onDone)
+    private void AddWave(Point origin, double radius, Color color, TimeSpan delay, bool small, Action? onDone)
     {
         var scale = new ScaleTransform(0, 0, radius, radius);
         var wave = new Ellipse
         {
             Width = radius * 2,
             Height = radius * 2,
-            Fill = CreateWaveBrush(color),
+            Fill = CreateWaveBrush(color, small),
             RenderTransform = scale,
             Opacity = 0,
         };
@@ -99,14 +119,14 @@ public sealed class RippleWindow : Window
 
         var expand = new DoubleAnimationUsingKeyFrames { BeginTime = delay };
         expand.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-        expand.KeyFrames.Add(new SplineDoubleKeyFrame(1, KeyTime.FromTimeSpan(ExpandDuration), MuiEasing));
+        expand.KeyFrames.Add(new SplineDoubleKeyFrame(1, KeyTime.FromTimeSpan(small ? SmallExpandDuration : ExpandDuration), MuiEasing));
         scale.BeginAnimation(ScaleTransform.ScaleXProperty, expand);
         scale.BeginAnimation(ScaleTransform.ScaleYProperty, expand);
 
         var fade = new DoubleAnimationUsingKeyFrames { BeginTime = delay };
         fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-        fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(FadeStart)));
-        fade.KeyFrames.Add(new SplineDoubleKeyFrame(0, KeyTime.FromTimeSpan(FadeEnd), MuiEasing));
+        fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(small ? SmallFadeStart : FadeStart)));
+        fade.KeyFrames.Add(new SplineDoubleKeyFrame(0, KeyTime.FromTimeSpan(small ? SmallFadeEnd : FadeEnd), MuiEasing));
         if (onDone is not null)
         {
             fade.Completed += (_, _) => onDone();
@@ -116,12 +136,12 @@ public sealed class RippleWindow : Window
     }
 
     // Soft fill, a little stronger toward the wave front, feathered at the very edge (no hard line).
-    private static Brush CreateWaveBrush(Color color)
+    private static Brush CreateWaveBrush(Color color, bool small)
     {
         var brush = new RadialGradientBrush();
-        brush.GradientStops.Add(new GradientStop(WithAlpha(color, 0x24), 0.0));
-        brush.GradientStops.Add(new GradientStop(WithAlpha(color, 0x38), 0.75));
-        brush.GradientStops.Add(new GradientStop(WithAlpha(color, 0x5C), 0.93));
+        brush.GradientStops.Add(new GradientStop(WithAlpha(color, small ? (byte)0x3C : (byte)0x24), 0.0));
+        brush.GradientStops.Add(new GradientStop(WithAlpha(color, small ? (byte)0x5C : (byte)0x38), 0.75));
+        brush.GradientStops.Add(new GradientStop(WithAlpha(color, small ? (byte)0x90 : (byte)0x5C), 0.93));
         brush.GradientStops.Add(new GradientStop(WithAlpha(color, 0x00), 1.0));
         brush.Freeze();
         return brush;

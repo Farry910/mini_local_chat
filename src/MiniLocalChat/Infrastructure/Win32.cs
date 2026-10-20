@@ -152,6 +152,23 @@ internal static class Win32
     /// </summary>
     public static bool IsFullScreenAppRunning() => QueryUserState() is 2 or 3 or 7;
 
+    /// <summary>The screen is locked, the screensaver runs, or another user's session is in front.</summary>
+    public static bool IsSessionLocked() => QueryUserState() is 1;
+
+    /// <summary>Where the mouse pointer is, in physical screen pixels (null if Windows won't say, e.g. while locked).</summary>
+    public static (int X, int Y)? CursorPosition() => GetCursorPos(out var point) ? (point.X, point.Y) : null;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out NativePoint point);
+
     // 1 not present (locked), 2 busy (full screen), 3 Direct3D full screen, 4 presentation mode,
     // 5 normal, 6 quiet time, 7 full-screen store app. 0 if unknown.
     private static int QueryUserState() =>

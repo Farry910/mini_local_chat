@@ -56,6 +56,8 @@ public partial class SettingsWindow : Window
         RippleBox.IsChecked = _chat.Settings.RippleEnabled;
         RippleGapBox.Text = _chat.Settings.RippleMinGapSeconds.ToString();
         SkipFullScreenBox.IsChecked = _chat.Settings.RippleSkipFullScreen;
+        ReminderBox.IsChecked = _chat.Settings.RippleReminder;
+        AwayBox.Text = _chat.Settings.AwayAfterMinutes.ToString();
         _hotkey = _chat.Settings.Hotkey;
         HotkeyBox.Text = string.IsNullOrEmpty(_hotkey) ? "None" : _hotkey;
 
@@ -113,6 +115,14 @@ public partial class SettingsWindow : Window
                 return;
             }
 
+            if (!int.TryParse(AwayBox.Text.Trim(), out var awayMinutes) || awayMinutes is < 0 or > 240)
+            {
+                AwayError.Text = "Enter a number of minutes from 0 to 240.";
+                AwayError.Visibility = Visibility.Visible;
+                AwayBox.Focus();
+                return;
+            }
+
             if (_hotkey != _chat.Settings.Hotkey && !App.Current.ApplyHotkey(_hotkey, out var hotkeyError))
             {
                 HotkeyHint.Text = hotkeyError;
@@ -124,6 +134,8 @@ public partial class SettingsWindow : Window
             _chat.Settings.Hotkey = _hotkey;
             _chat.SetRippleEnabled(RippleBox.IsChecked == true);
             _chat.Settings.RippleSkipFullScreen = SkipFullScreenBox.IsChecked == true;
+            _chat.Settings.RippleReminder = ReminderBox.IsChecked == true;
+            _chat.Settings.AwayAfterMinutes = awayMinutes;
             _chat.Settings.RippleMinGapSeconds = gap;
             _chat.Settings.LedSide = LedLeft.IsChecked == true ? nameof(LedSide.Left) : nameof(LedSide.Right);
             var autoStart = AutoStartBox.IsChecked == true;

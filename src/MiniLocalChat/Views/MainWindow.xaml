@@ -16,7 +16,7 @@
         <!-- App rail -->
         <Border Background="{StaticResource RailBrush}" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,0,1,0">
             <DockPanel LastChildFill="False">
-                <c:Avatar DockPanel.Dock="Top" Width="36" Height="36" Margin="0,14,0,12" ShowPresence="True" IsOnline="True"
+                <c:Avatar DockPanel.Dock="Top" Width="36" Height="36" Margin="0,14,0,12" ShowPresence="True" IsOnline="True" IsAway="{Binding Me.IsAway}"
                           Text="{Binding Me.Initials}" Fill="{Binding Me.AvatarBrush}" Image="{Binding Me.AvatarImage}">
                     <c:Avatar.ToolTip>
                         <TextBlock>

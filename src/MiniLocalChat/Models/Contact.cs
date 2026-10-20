@@ -16,6 +16,7 @@ public sealed class Contact : ObservableObject
     private string? _color1;
     private string? _color2;
     private bool _isOnline;
+    private bool _isAway;
     private bool _rippleBlocked;
     private string? _avatarId;
 
@@ -108,8 +109,37 @@ public sealed class Contact : ObservableObject
     public bool IsOnline
     {
         get => _isOnline;
-        set => Set(ref _isOnline, value);
+        set
+        {
+            if (Set(ref _isOnline, value))
+            {
+                if (!value)
+                {
+                    IsAway = false;
+                }
+
+                OnPropertyChanged(nameof(PresenceText));
+            }
+        }
     }
+
+    /// <summary>Online but away: their mouse hasn't moved for a while, or their screen is locked.</summary>
+    [JsonIgnore]
+    public bool IsAway
+    {
+        get => _isAway;
+        set
+        {
+            if (Set(ref _isAway, value))
+            {
+                OnPropertyChanged(nameof(PresenceText));
+            }
+        }
+    }
+
+    /// <summary>For chat headers: "Online", "Away" or "Offline · …".</summary>
+    [JsonIgnore]
+    public string PresenceText => !IsOnline ? "Offline · messages are delivered when they come online" : IsAway ? "Away" : "Online";
 
     [JsonIgnore]
     public string DisplayName => string.IsNullOrWhiteSpace(Nickname) ? Ip : Nickname;

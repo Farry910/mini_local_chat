@@ -8,13 +8,18 @@ using MiniLocalChat.Infrastructure;
 namespace MiniLocalChat.Services;
 
 /// <summary>
-/// Profile pictures: a 128×128 PNG named by the hash of its bytes ("avatar id"). The id travels in every
-/// heartbeat and message; a computer that doesn't have that picture yet asks its owner for it once.
+/// Profile pictures: a square PNG up to 640×640 (big enough to view full size, like Telegram), named by
+/// the hash of its bytes ("avatar id"). The id travels in every heartbeat and message; a computer that
+/// doesn't have that picture yet asks its owner for it once.
 /// </summary>
 public static partial class AvatarStore
 {
-    public const int PixelSize = 128;
-    public const long MaxBytes = 512 * 1024;
+    /// <summary>Stored size of new pictures (older ones are 128 px).</summary>
+    public const int PixelSize = 640;
+    public const long MaxBytes = 2 * 1024 * 1024;
+
+    /// <summary>Avatars in lists and chats are small: decode just this much (sharp up to ~56 px at 250 % DPI).</summary>
+    private const int ThumbnailPixels = 160;
 
     private static readonly Dictionary<string, ImageSource> Cache = new();
 
@@ -48,10 +53,35 @@ public static partial class AvatarStore
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.DecodePixelWidth = ThumbnailPixels;
             bitmap.UriSource = new Uri(path);
             bitmap.EndInit();
             bitmap.Freeze();
             return Cache[id] = bitmap;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The picture at full size, for the viewer (not cached).</summary>
+    public static BitmapSource? FullImageFor(string? id)
+    {
+        if (PathFor(id) is not { } path)
+        {
+            return null;
+        }
+
+        try
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.UriSource = new Uri(path);
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
         }
         catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or InvalidOperationException)
         {
@@ -70,7 +100,8 @@ public static partial class AvatarStore
 
         var side = Math.Min(source.PixelWidth, source.PixelHeight);
         var square = new CroppedBitmap(source, new Int32Rect((source.PixelWidth - side) / 2, (source.PixelHeight - side) / 2, side, side));
-        var scaled = new TransformedBitmap(square, new ScaleTransform((double)PixelSize / side, (double)PixelSize / side));
+        var scale = Math.Min(1.0, (double)PixelSize / side); // never blow a small picture up
+        BitmapSource scaled = scale < 1 ? new TransformedBitmap(square, new ScaleTransform(scale, scale)) : square;
 
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(scaled));

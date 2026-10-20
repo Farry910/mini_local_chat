@@ -69,6 +69,20 @@
             <CheckBox x:Name="SkipFullScreenBox" Margin="22,8,0,0" VerticalContentAlignment="Center" FontSize="13"
                       IsEnabled="{Binding IsChecked, ElementName=RippleBox}"
                       Content="Not while a full-screen app is in front (games, videos, remote desktop)" />
+            <CheckBox x:Name="ReminderBox" Margin="22,8,0,0" VerticalContentAlignment="Center" FontSize="13"
+                      IsEnabled="{Binding IsChecked, ElementName=RippleBox}"
+                      Content="While messages are unread, a small ripple at the mouse pointer every 10 seconds" />
+
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Away status" />
+            <StackPanel Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" FontSize="13" Text="Show me as Away after" />
+                <TextBox x:Name="AwayBox" Width="48" Margin="8,0" Style="{StaticResource FieldTextBox}"
+                         HorizontalContentAlignment="Right" MaxLength="3" />
+                <TextBlock VerticalAlignment="Center" FontSize="13" Text="minutes without moving the mouse" />
+            </StackPanel>
+            <TextBlock x:Name="AwayError" Margin="0,4,0,0" FontSize="12" Foreground="#C4314B" Visibility="Collapsed" />
+            <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
+                       Text="Also Away while the screen is locked. 0 = only when locked." />
 
             <TextBlock Style="{StaticResource FieldLabel}" Text="Show / hide shortcut" />
             <DockPanel>
