@@ -4,7 +4,11 @@ A Teams-style private chat for computers on the same local network (e.g. a `192.
 
 - **Identity = IP address.** Each computer keeps a fixed IP; its user picks a nickname, and everyone else sees that nickname for that IP.
 - **1:1 and group chats** (pick several people in *New chat*), text, emoji, files and images (attach, drag & drop, or paste).
-- **Teams-style messages.** Hover a message for quick reactions (👍 ❤️ 😆 😮 😢 😡) and ⋯ → Reply, Forward, Copy, Edit, Delete (edit/delete your own). Replies quote the original (click to jump to it); edits and deletes update for everyone. **Find in chat** with Ctrl+F.
+- **Teams-style messages.** Hover a message for quick reactions (👍 ❤️ 😂 😮 😢 🙏), **+** for 56 more, **Reply**, and ⋯ → Forward, Copy, Edit, Delete (edit/delete your own). Replies quote the original (click to jump to it); edits and deletes update for everyone. **Find in chat** with Ctrl+F.
+- **Select and copy part of a message:** drag across the text (double-click a word, triple-click for all), then Ctrl+C or right-click → *Copy selected text*.
+- **Typing indicator:** *Alice is typing…* with bouncing dots above the message box, and *typing…* in the chat list.
+- **Color emoji** everywhere: messages, reactions, the emoji picker and chat previews (the message box itself still shows them in black and white while you type; that's a WPF limit).
+- **Clear chat history** (⋯ in the chat header, or right-click the chat): removes all messages on your computer only.
 - **Group chats:** rename, add people, leave (others are told), or delete the chat from your list.
 - **Chat list sections:** Favorites, Online, Offline (☆ a chat to pin it), with search in both the full window and the floating panel.
 - **Offline delivery.** Messages to someone who is offline are queued and sent automatically when they come back online. Your newest message shows **✓ Delivered**, then **✓✓ Seen** once they open the chat (in groups: *Seen by 2 of 3*).
@@ -20,6 +24,8 @@ A Teams-style private chat for computers on the same local network (e.g. a `192.
 - **Screen ripple.** When a message arrives, two Material-style waves in the sender's two colors spread across the whole screen from the LED. Every message ripples, at most once every 3 s so a burst of messages doesn't flood the screen (configurable in Settings). The overlay never blocks clicks or takes focus, and also shows over full-screen apps such as Chrome Remote Desktop (Settings can skip full-screen apps instead). Turn all ripples off or on with **Ripples** in the left rail, the same signal-shaped button in the floating panel header, or the LED's right-click menu; block a single person with *Block ripples* in their chat.
 - **Show / hide shortcut:** Ctrl+Alt+M opens the full window from anywhere and hides it again (change it in Settings).
 - **Exit** only from the tray icon menu (or the LED's right-click menu).
+
+Color emoji are drawn with [Emoji.Wpf](https://github.com/samhocevar/emoji.wpf) (WTFPL) from the Segoe UI Emoji font.
 
 The built-in animated emoji are [Noto Animated Emoji](https://googlefonts.github.io/noto-emoji-animation/) by Google, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), resized to 128 px (`tools/fetch-emoji.ps1` downloads them, `tools/ShrinkGifs.cs` resizes them).
 

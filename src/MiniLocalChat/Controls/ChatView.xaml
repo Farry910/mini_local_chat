@@ -13,8 +13,9 @@
         <!-- Text, image or file card, depending on the message kind; or the "deleted" note -->
         <DataTemplate x:Key="MessageBodyTemplate" DataType="{x:Type m:ChatMessage}">
             <Grid>
-                <TextBlock x:Name="TextPart" Text="{Binding Text}" TextWrapping="Wrap" FontSize="14"
-                           FontFamily="{StaticResource TextFont}" Foreground="{StaticResource TextBrush}" />
+                <!-- Selectable, with color emoji -->
+                <c:MessageText x:Name="TextPart" Text="{Binding Text}" FontSize="14"
+                               FontFamily="{StaticResource TextFont}" Foreground="{StaticResource TextBrush}" />
 
                 <Image x:Name="ImagePart" Visibility="Collapsed" Stretch="Uniform" StretchDirection="DownOnly"
                        MaxHeight="280" Cursor="Hand" ToolTip="{Binding FileName}" MouseLeftButtonUp="OnImageClick"
@@ -99,20 +100,26 @@
                         Visibility="{Binding ReplyTo, Converter={StaticResource NotNullToVisibility}}">
                     <StackPanel>
                         <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" Text="{Binding ReplyTo.SenderName}" />
-                        <TextBlock FontSize="12" FontFamily="{StaticResource TextFont}" Foreground="{StaticResource SubtleTextBrush}"
-                                   Text="{Binding ReplyTo.Preview}" TextTrimming="CharacterEllipsis" MaxHeight="34" TextWrapping="Wrap" />
+                        <c:EmojiLabel FontSize="12" FontFamily="{StaticResource TextFont}" Foreground="{StaticResource SubtleTextBrush}"
+                                   Text="{Binding ReplyTo.Preview}" />
                     </StackPanel>
                 </Border>
                 <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MessageBodyTemplate}" Focusable="False" />
             </StackPanel>
         </DataTemplate>
 
-        <!-- Hover bar: quick reactions + "more" -->
+        <!-- An emoji (string content) in color -->
+        <DataTemplate x:Key="EmojiGlyph">
+            <TextBlock c:EmojiText.Text="{Binding}" />
+        </DataTemplate>
+
+        <!-- Hover bar: quick reactions, more reactions, reply, more options -->
         <Style x:Key="ToolbarEmojiButton" TargetType="Button">
             <Setter Property="Width" Value="28" />
             <Setter Property="Height" Value="28" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="FontFamily" Value="Segoe UI Emoji" />
+            <Setter Property="ContentTemplate" Value="{StaticResource EmojiGlyph}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Template">
@@ -154,7 +161,11 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <Button Width="28" Height="28" FontSize="13" Style="{StaticResource IconButton}" Content="&#xE710;"
+                            ToolTip="More reactions" Click="OnMoreReactions" />
                     <Border Width="1" Margin="3,4" Background="{StaticResource DividerBrush}" />
+                    <Button Width="28" Height="28" FontSize="14" Style="{StaticResource IconButton}" Content="&#xE97A;"
+                            ToolTip="Reply" Click="OnReplyClick" />
                     <Button Width="28" Height="28" FontSize="14" Style="{StaticResource IconButton}" Content="&#xE712;"
                             ToolTip="More options" Click="OnMoreActions" />
                 </StackPanel>
@@ -190,7 +201,7 @@
         <DataTemplate x:Key="ReactionChipTemplate" DataType="{x:Type m:ReactionChip}">
             <Button Style="{StaticResource ReactionChipButton}" ToolTip="{Binding Names}" Click="OnReactionChipClick">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock FontFamily="Segoe UI Emoji" FontSize="13" Text="{Binding Emoji}" />
+                    <TextBlock VerticalAlignment="Center" FontSize="13" c:EmojiText.Text="{Binding Emoji}" />
                     <TextBlock Margin="4,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource TextBrush}" Text="{Binding Count}" />
                 </StackPanel>
             </Button>
@@ -333,6 +344,7 @@
             <Setter Property="Height" Value="34" />
             <Setter Property="FontSize" Value="18" />
             <Setter Property="FontFamily" Value="Segoe UI Emoji" />
+            <Setter Property="ContentTemplate" Value="{StaticResource EmojiGlyph}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Template">
@@ -371,6 +383,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
@@ -450,8 +463,33 @@
                        FontSize="13" Foreground="{StaticResource SubtleTextBrush}" Text="No messages match your search."
                        Visibility="Collapsed" />
 
+            <!-- "Alice is typing…" with bouncing dots. The line keeps its space so the chat doesn't jump. -->
+            <StackPanel x:Name="TypingLine" Grid.Row="3" Height="18" Margin="24,0,20,0" Orientation="Horizontal"
+                        Visibility="Hidden" IsHitTestVisible="False">
+                <StackPanel.Resources>
+                    <Style TargetType="Ellipse">
+                        <Setter Property="Width" Value="5" />
+                        <Setter Property="Height" Value="5" />
+                        <Setter Property="Margin" Value="0,0,3,0" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="Fill" Value="{StaticResource AccentBrush}" />
+                        <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+                        <Setter Property="RenderTransform">
+                            <Setter.Value>
+                                <TranslateTransform />
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </StackPanel.Resources>
+                <Ellipse x:Name="TypingDot1" />
+                <Ellipse x:Name="TypingDot2" />
+                <Ellipse x:Name="TypingDot3" />
+                <TextBlock x:Name="TypingLabel" Margin="5,0,0,0" VerticalAlignment="Center" FontSize="12" FontStyle="Italic"
+                           Foreground="{StaticResource SubtleTextBrush}" Text="{Binding TypingText}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
             <!-- Composer -->
-            <Border x:Name="Composer" Grid.Row="3" Margin="20,4,20,16" Style="{StaticResource ComposerBorder}">
+            <Border x:Name="Composer" Grid.Row="4" Margin="20,4,20,16" Style="{StaticResource ComposerBorder}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -468,8 +506,8 @@
                                     Content="&#xE711;" ToolTip="Cancel (Esc)" Click="OnCancelComposerMode" />
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock x:Name="BannerTitle" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
-                                <TextBlock x:Name="BannerText" FontSize="12" FontFamily="{StaticResource TextFont}"
-                                           Foreground="{StaticResource SubtleTextBrush}" TextTrimming="CharacterEllipsis" />
+                                <c:EmojiLabel x:Name="BannerText" FontSize="12" FontFamily="{StaticResource TextFont}"
+                                           Foreground="{StaticResource SubtleTextBrush}" />
                             </StackPanel>
                         </DockPanel>
                     </Border>
@@ -516,7 +554,7 @@
                     <Grid Grid.Row="2" Margin="10,8,10,0">
                         <TextBox x:Name="Input" Style="{StaticResource BareTextBox}" AcceptsReturn="True" TextWrapping="Wrap"
                                  MaxLength="20000" MinHeight="22" MaxHeight="140" VerticalScrollBarVisibility="Auto"
-                                 PreviewKeyDown="OnInputPreviewKeyDown" />
+                                 PreviewKeyDown="OnInputPreviewKeyDown" TextChanged="OnInputTextChanged" />
                         <TextBlock Margin="3,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" FontSize="14"
                                    Foreground="#8A8A8A" Text="Type a message"
                                    Visibility="{Binding Text, ElementName=Input, Converter={StaticResource EmptyToVisible}}" />

@@ -324,6 +324,11 @@
                 <TextBlock FontFamily="{StaticResource IconFont}" Foreground="#E3A100" Text="&#xE735;" />
             </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="Clear chat history…" Command="{x:Static v:ChatActions.ClearHistoryCommand}" CommandParameter="{Binding}">
+            <MenuItem.Icon>
+                <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE894;" />
+            </MenuItem.Icon>
+        </MenuItem>
         <Separator Visibility="{Binding IsGroup, Converter={StaticResource BoolToVisibility}}" />
         <MenuItem Header="Rename group…" Command="{x:Static v:ChatActions.RenameGroupCommand}" CommandParameter="{Binding}"
                   Visibility="{Binding IsGroup, Converter={StaticResource BoolToVisibility}}">
@@ -407,9 +412,9 @@
                        Foreground="{StaticResource SubtleTextBrush}"
                        Text="{Binding LastActivityUtc, Converter={StaticResource ListTime}}" />
 
-            <TextBlock x:Name="PreviewText" Grid.Row="1" Grid.Column="1" Margin="0,2,0,0" FontSize="12"
+            <c:EmojiLabel x:Name="PreviewText" Grid.Row="1" Grid.Column="1" Margin="0,2,0,0" FontSize="12"
                        FontFamily="{StaticResource TextFont}" Foreground="{StaticResource SubtleTextBrush}"
-                       Text="{Binding LastPreview}" TextTrimming="CharacterEllipsis" />
+                       Text="{Binding LastPreview}" />
             <Border Grid.Row="1" Grid.Column="2" Height="18" MinWidth="18" Margin="8,2,0,0" Padding="5,0"
                     HorizontalAlignment="Right" CornerRadius="9" Background="{StaticResource AccentBrush}"
                     Visibility="{Binding UnreadCount, Converter={StaticResource CountToVisibility}}">
@@ -422,6 +427,13 @@
                 <Setter TargetName="TitleText" Property="FontWeight" Value="Bold" />
                 <Setter TargetName="PreviewText" Property="FontWeight" Value="SemiBold" />
                 <Setter TargetName="PreviewText" Property="Foreground" Value="{StaticResource TextBrush}" />
+            </DataTrigger>
+            <!-- Last, so it wins: "typing…" replaces the preview while someone types. -->
+            <DataTrigger Binding="{Binding IsTyping}" Value="True">
+                <Setter TargetName="PreviewText" Property="Text" Value="{Binding TypingPreview}" />
+                <Setter TargetName="PreviewText" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="PreviewText" Property="FontStyle" Value="Italic" />
+                <Setter TargetName="PreviewText" Property="FontWeight" Value="Normal" />
             </DataTrigger>
         </DataTemplate.Triggers>
     </DataTemplate>

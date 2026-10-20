@@ -22,6 +22,8 @@ public static class ChatActions
 
     public static ICommand DeleteChatCommand { get; } = new ConversationCommand(DeleteChat, c => c.IsGroup);
 
+    public static ICommand ClearHistoryCommand { get; } = new ConversationCommand(ClearHistory, c => c.Messages.Count > 0);
+
     /// <summary>The window dialogs should sit on: the active one (main window or floating panel).</summary>
     private static Window? ActiveWindow =>
         Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive && w.IsVisible);
@@ -59,6 +61,15 @@ public static class ChatActions
                 "Its history is removed from this computer only. It comes back if someone writes in it again. To stop getting its messages, leave the group instead."))
         {
             App.Chat.DeleteChat(conversation);
+        }
+    }
+
+    public static void ClearHistory(Conversation conversation)
+    {
+        if (Confirm($"Clear all messages in “{conversation.Title}”?",
+                "Every message, picture and reaction in this chat is removed from this computer. The others keep their copy. Received files stay in your Files folder."))
+        {
+            App.Chat.ClearHistory(conversation);
         }
     }
 

@@ -75,7 +75,7 @@ public sealed partial class ChatService
         }
     }
 
-    /// <summary>One-off send outside the delivery queue (picture requests and replies).</summary>
+    /// <summary>One-off send outside the delivery queue (picture requests and replies, typing).</summary>
     private void SendDirect(string ip, WireHeader header, string? filePath)
     {
         var bind = BindAddress;
@@ -89,7 +89,7 @@ public sealed partial class ChatService
             }
             catch (Exception ex)
             {
-                Log.Error("Sending picture", ex);
+                Log.Error("Direct send", ex);
             }
         });
     }

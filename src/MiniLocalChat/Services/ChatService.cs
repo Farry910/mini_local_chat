@@ -376,6 +376,7 @@ public sealed partial class ChatService : ObservableObject
         message.SenderIp = Me.Ip;
         message.SentUtc = DateTime.UtcNow;
         message.Sender = Me;
+        StoppedTypingBySending(conversation);
 
         var recipients = Recipients(conversation);
         foreach (var ip in recipients)
@@ -517,6 +518,9 @@ public sealed partial class ChatService : ObservableObject
             case WireTypes.Seen:
                 ReceiveSeen(header, sender);
                 break;
+            case WireTypes.Typing:
+                ReceiveTyping(header, sender);
+                return true; // nothing to save
             case WireTypes.AvatarGet:
                 ReceiveAvatarRequest(header, sender);
                 return true;
@@ -557,6 +561,7 @@ public sealed partial class ChatService : ObservableObject
         }
 
         AddToConversation(conversation, message);
+        conversation.SetTyping(sender, false, default); // they sent it, so they're done typing
         if (IsConversationVisible(conversation))
         {
             ReportSeen(conversation); // it's on screen right now

@@ -9,6 +9,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MiniLocalChat.Infrastructure;
@@ -62,6 +63,8 @@ public partial class ChatView : UserControl
     private bool _pinnedToBottom = true;
     private ListCollectionView? _savedGifs;
     private ListCollectionView? _stickers;
+    private bool _restoringDraft;
+    private Storyboard? _typingDots;
 
     public ChatView()
     {
@@ -176,6 +179,8 @@ public partial class ChatView : UserControl
         if (oldValue is not null)
         {
             oldValue.Messages.CollectionChanged -= OnMessagesChanged;
+            oldValue.PropertyChanged -= OnConversationPropertyChanged;
+            App.Chat.NotifyTyping(oldValue, false);
             _drafts[oldValue] = _editing is null ? Input.Text : _draftBeforeEdit;
             _attachmentDrafts[oldValue] = [.. _attachments];
         }
@@ -207,9 +212,68 @@ public partial class ChatView : UserControl
         if (newValue is not null)
         {
             newValue.Messages.CollectionChanged += OnMessagesChanged;
+            newValue.PropertyChanged += OnConversationPropertyChanged;
+            _restoringDraft = true;
             Input.Text = _drafts.GetValueOrDefault(newValue, "");
+            _restoringDraft = false;
             Input.CaretIndex = Input.Text.Length;
             ScrollToEndSoon();
+        }
+
+        UpdateTypingLine();
+    }
+
+    // ---- "Alice is typing…" ---------------------------------------------------------------------
+
+    private void OnConversationPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Models.Conversation.IsTyping))
+        {
+            UpdateTypingLine();
+        }
+    }
+
+    private void UpdateTypingLine()
+    {
+        var typing = Conversation?.IsTyping == true;
+        TypingLine.Visibility = typing ? Visibility.Visible : Visibility.Hidden;
+        if (typing)
+        {
+            _typingDots ??= CreateTypingDots();
+            _typingDots.Begin(this, isControllable: true);
+        }
+        else
+        {
+            _typingDots?.Stop(this);
+        }
+    }
+
+    /// <summary>Three dots hopping one after another (at a low frame rate: it's tiny).</summary>
+    private Storyboard CreateTypingDots()
+    {
+        var storyboard = new Storyboard { RepeatBehavior = RepeatBehavior.Forever, Duration = TimeSpan.FromSeconds(1.2) };
+        Timeline.SetDesiredFrameRate(storyboard, 30);
+        var dots = new[] { TypingDot1, TypingDot2, TypingDot3 };
+        for (var i = 0; i < dots.Length; i++)
+        {
+            var hop = new DoubleAnimationUsingKeyFrames { BeginTime = TimeSpan.FromSeconds(0.15 * i) };
+            hop.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            hop.KeyFrames.Add(new EasingDoubleKeyFrame(-3, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.25)), new SineEase()));
+            hop.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.5)), new SineEase()));
+            Storyboard.SetTarget(hop, dots[i]);
+            Storyboard.SetTargetProperty(hop, new PropertyPath("RenderTransform.Y"));
+            storyboard.Children.Add(hop);
+        }
+
+        return storyboard;
+    }
+
+    /// <summary>Tells the others I'm typing (or stopped) — only for real typing, not restoring a draft or editing.</summary>
+    private void OnInputTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_restoringDraft && _editing is null && Conversation is { } conversation)
+        {
+            App.Chat.NotifyTyping(conversation, !string.IsNullOrWhiteSpace(Input.Text));
         }
     }
 
@@ -220,6 +284,8 @@ public partial class ChatView : UserControl
         ComposerHint.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         MessageList.Padding = compact ? new Thickness(10, 2, 10, 8) : new Thickness(20, 4, 20, 12);
         Composer.Margin = compact ? new Thickness(8, 2, 8, 8) : new Thickness(20, 4, 20, 16);
+        TypingLine.Margin = compact ? new Thickness(12, 0, 8, 0) : new Thickness(24, 0, 20, 0);
+        TypingLine.Margin = compact ? new Thickness(12, 0, 8, 0) : new Thickness(24, 0, 20, 0);
         BubbleMaxWidth = compact ? 270 : 560;
         ImageMaxWidth = compact ? 230 : 320;
         GifPanel.Width = compact ? 316 : 340;
@@ -603,7 +669,16 @@ public partial class ChatView : UserControl
         var menu = new ContextMenu { PlacementTarget = target, Placement = placement };
         AddItem(menu, "Reply", "", () => StartReply(message));
         AddItem(menu, "Forward", "", () => Forward(message));
-        AddItem(menu, "Copy", "", () => Copy(message));
+        if (MessageText.SelectionIn(message) is { } selected)
+        {
+            AddItem(menu, "Copy selected text", "", () => CopyText(selected));
+            AddItem(menu, "Copy whole message", "", () => Copy(message));
+        }
+        else
+        {
+            AddItem(menu, "Copy", "", () => Copy(message));
+        }
+
         if (message.IsGif && !message.IsSticker && message.LocalPath is { } gifPath && File.Exists(gifPath) && !GifLibrary.Contains(gifPath))
         {
             AddItem(menu, "Save GIF", "", () => GifLibrary.Add(gifPath));
@@ -651,6 +726,63 @@ public partial class ChatView : UserControl
         }
     }
 
+    private void OnReplyClick(object sender, RoutedEventArgs e)
+    {
+        if (MessageOf(sender) is { HasActions: true } message)
+        {
+            StartReply(message);
+        }
+    }
+
+    /// <summary>The + on the hover bar: every reaction, in a grid next to the mouse.</summary>
+    private void OnMoreReactions(object sender, RoutedEventArgs e)
+    {
+        if (MessageOf(sender) is not { HasActions: true } message)
+        {
+            return;
+        }
+
+        var grid = new UniformGrid { Columns = 8 };
+        var popup = new Popup
+        {
+            // At the mouse: the hover bar hides as soon as the mouse moves into the popup.
+            PlacementTarget = MessageList,
+            Placement = PlacementMode.MousePoint,
+            StaysOpen = false,
+            AllowsTransparency = true,
+            PopupAnimation = PopupAnimation.Fade,
+            Child = new Border
+            {
+                Margin = new Thickness(0, 4, 8, 8),
+                Padding = new Thickness(4),
+                Background = Brushes.White,
+                BorderBrush = (Brush)FindResource("DividerBrush"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Effect = new DropShadowEffect { BlurRadius = 8, ShadowDepth = 1, Opacity = 0.18 },
+                Child = grid,
+            },
+        };
+        var style = (Style)FindResource("ToolbarEmojiButton");
+        foreach (var emoji in ChatMessage.MoreReactions)
+        {
+            var button = new Button { Style = style, Content = emoji, Width = 32, Height = 32, FontSize = 17 };
+            if (message.Reactions.TryGetValue(emoji, out var people) && people.Contains(App.Chat.Me.Ip))
+            {
+                button.Background = (Brush)FindResource("AccentLightBrush"); // already mine: clicking takes it back
+            }
+
+            button.Click += (_, _) =>
+            {
+                popup.IsOpen = false;
+                App.Chat.ToggleReaction(message, emoji);
+            };
+            grid.Children.Add(button);
+        }
+
+        popup.IsOpen = true;
+    }
+
     private void OnReactionChipClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button { DataContext: ReactionChip chip } && MessageOf(VisualTreeHelper.GetParent((Button)sender)) is { } message)
@@ -686,6 +818,18 @@ public partial class ChatView : UserControl
         }
 
         App.Chat.DeleteMessage(message);
+    }
+
+    private static void CopyText(string text)
+    {
+        try
+        {
+            Clipboard.SetText(text);
+        }
+        catch (ExternalException ex)
+        {
+            Log.Error("Copy", ex);
+        }
     }
 
     private static void Copy(ChatMessage message)

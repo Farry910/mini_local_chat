@@ -105,6 +105,9 @@ public static class WireTypes
     /// <summary>"I've seen the chat up to message <c>TargetId</c>" (read receipt, the double tick).</summary>
     public const string Seen = "seen";
 
+    /// <summary>"I'm typing in this chat" (<c>On</c> = true) or "I stopped". Sent directly, never queued.</summary>
+    public const string Typing = "typing";
+
     /// <summary>"Please send me your picture with id <c>Text</c>."</summary>
     public const string AvatarGet = "avatar-get";
 

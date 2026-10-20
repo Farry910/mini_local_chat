@@ -38,8 +38,20 @@ public sealed record ReactionChip(string Emoji, int Count, bool Mine, string Nam
 
 public sealed class ChatMessage : ObservableObject
 {
-    /// <summary>Teams' quick reactions.</summary>
-    public static readonly string[] QuickReactions = ["👍", "❤️", "😆", "😮", "😢", "😡"];
+    /// <summary>The quick reactions on the hover bar.</summary>
+    public static readonly string[] QuickReactions = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+    /// <summary>All reactions, behind the hover bar's + button.</summary>
+    public static readonly string[] MoreReactions =
+    [
+        "👍", "👎", "❤️", "🔥", "😂", "🤣", "😆", "😊",
+        "😍", "🥰", "😘", "😎", "🤩", "🥳", "😮", "😲",
+        "🤯", "😢", "😭", "😡", "🤬", "😱", "😬", "🙄",
+        "🤔", "😇", "😴", "🤗", "🙈", "🤦", "🤷", "😅",
+        "🙏", "👏", "🙌", "💪", "👌", "✌️", "🤝", "👋",
+        "👀", "💯", "🎉", "✅", "❌", "⭐", "💡", "🚀",
+        "☕", "🍕", "🍺", "🎂", "💔", "💩", "🤡", "👻",
+    ];
 
     private string _text = "";
     private string? _localPath;

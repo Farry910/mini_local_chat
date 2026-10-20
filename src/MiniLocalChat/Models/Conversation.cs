@@ -192,4 +192,80 @@ public sealed class Conversation : ObservableObject
 
     /// <summary>Call when a message was edited or deleted.</summary>
     public void RefreshPreview() => OnPropertyChanged(nameof(LastPreview));
+
+    /// <summary>Removes every message, on this computer only.</summary>
+    public void ClearMessages()
+    {
+        Messages.Clear();
+        UnreadCount = 0;
+        LastSeenReported = null;
+        OnPropertyChanged(nameof(LastPreview));
+    }
+
+    // ---- Typing indicator -----------------------------------------------------------------------
+
+    private readonly Dictionary<Contact, DateTime> _typingUntilUtc = new();
+
+    [JsonIgnore]
+    public bool IsTyping => _typingUntilUtc.Count > 0;
+
+    /// <summary>"Alice is typing…", "Alice and Bob are typing…", "3 people are typing…", or "".</summary>
+    [JsonIgnore]
+    public string TypingText
+    {
+        get
+        {
+            var names = _typingUntilUtc.Keys.Select(c => c.DisplayName).ToList();
+            return names.Count switch
+            {
+                0 => "",
+                1 => $"{names[0]} is typing…",
+                2 => $"{names[0]} and {names[1]} are typing…",
+                _ => $"{names.Count} people are typing…",
+            };
+        }
+    }
+
+    /// <summary>For the chat list: "typing…" (1:1) or who is typing (groups).</summary>
+    [JsonIgnore]
+    public string TypingPreview => IsGroup ? TypingText : IsTyping ? "typing…" : "";
+
+    /// <summary>Someone started typing (until <paramref name="untilUtc"/> unless they keep going) or stopped.</summary>
+    public void SetTyping(Contact contact, bool typing, DateTime untilUtc)
+    {
+        var changed = typing ? !_typingUntilUtc.ContainsKey(contact) : _typingUntilUtc.Remove(contact);
+        if (typing)
+        {
+            _typingUntilUtc[contact] = untilUtc;
+        }
+
+        if (changed)
+        {
+            OnTypingChanged();
+        }
+    }
+
+    /// <summary>Drops people who stopped sending "typing". Returns whether anyone is still typing.</summary>
+    public bool ExpireTyping(DateTime nowUtc)
+    {
+        var expired = _typingUntilUtc.Where(p => p.Value <= nowUtc).Select(p => p.Key).ToList();
+        foreach (var contact in expired)
+        {
+            _typingUntilUtc.Remove(contact);
+        }
+
+        if (expired.Count > 0)
+        {
+            OnTypingChanged();
+        }
+
+        return IsTyping;
+    }
+
+    private void OnTypingChanged()
+    {
+        OnPropertyChanged(nameof(IsTyping));
+        OnPropertyChanged(nameof(TypingText));
+        OnPropertyChanged(nameof(TypingPreview));
+    }
 }
