@@ -61,7 +61,7 @@ public partial class SettingsWindow : Window
         AutoUpdateBox.IsChecked = _chat.Settings.AutoUpdate;
         UpdateNote.Text = $"This is version {Updater.CurrentVersion.ToString(3)}. "
             + (_chat.StagedUpdate is { } staged ? $"Version {staged.ToString(3)} is ready and installs when you're not using the app."
-               : Updater.IsInstalledBuild ? "Only releases signed by the publisher are installed; no internet needed."
+               : Updater.IsInstalledBuild ? "Newer versions come from other computers on your network; no internet needed."
                : "This is a development build, so it doesn't update itself.");
         _hotkey = _chat.Settings.Hotkey;
         HotkeyBox.Text = string.IsNullOrEmpty(_hotkey) ? "None" : _hotkey;

@@ -5,26 +5,24 @@ using MiniLocalChat.Network;
 namespace MiniLocalChat.Services;
 
 /// <summary>
-/// Auto-update over the LAN, no internet needed. Every heartbeat says which signed version this computer
-/// can hand out. Seeing a higher one, I ask that computer for its exe ("update-get"), it sends it
-/// ("update", the exe as payload, the signature in the header), I check it (see <see cref="Updater"/>)
-/// and stage it; the app installs it and restarts when nobody is using it. Once updated, I hand the new
-/// version out too, so a release spreads from computer to computer.
+/// Auto-update over the LAN, no internet needed. Every heartbeat says which version this computer can
+/// hand out. Seeing a higher one, I ask that computer for its exe ("update-get"), it sends it ("update",
+/// the exe as payload), I check it (see <see cref="Updater"/>) and stage it; the app installs it and
+/// restarts when nobody is using it. Once updated, I hand the new version out too, so a release spreads
+/// from computer to computer.
 /// </summary>
 public sealed partial class ChatService
 {
     private const int MaxUploads = 2;
     private static readonly TimeSpan UpdateRequestTimeout = TimeSpan.FromMinutes(2);
 
-    /// <summary>My signed exe, if I can hand it out.</summary>
-    private byte[]? _ownSignature;
     private int _uploads;
     private (string Ip, Version Version, DateTime AtUtc)? _updateRequest;
     private readonly HashSet<(string Ip, Version Version)> _badUpdates = [];
     private bool _updatesBlocked;
 
-    /// <summary>The version I can hand out (my own, signed), for the heartbeat; null for development builds.</summary>
-    private string? ServableVersion => _ownSignature is null ? null : Updater.CurrentVersion.ToString(3);
+    /// <summary>The version I can hand out (my own exe), for the heartbeat; null for development builds.</summary>
+    private static string? ServableVersion => Updater.IsInstalledBuild ? Updater.CurrentVersion.ToString(3) : null;
 
     /// <summary>A newer version, checked and ready to install (on the next restart).</summary>
     public Version? StagedUpdate { get; private set; }
@@ -32,15 +30,7 @@ public sealed partial class ChatService
     /// <summary>A newer version was downloaded and checked; the app decides when to restart into it.</summary>
     public event Action? UpdateStaged;
 
-    private void StartUpdates()
-    {
-        Updater.CleanUp();
-        _ = Task.Run(() =>
-        {
-            var signature = Updater.ReadOwnSignature(); // hashes the whole exe: not on the UI thread
-            _ui.InvokeAsync(() => _ownSignature = signature);
-        });
-    }
+    private static void StartUpdates() => Updater.CleanUp();
 
     /// <summary>A heartbeat said this person can hand out <paramref name="advertised"/>.</summary>
     private void ConsiderUpdate(Contact contact, string? advertised)
@@ -65,7 +55,7 @@ public sealed partial class ChatService
     /// <summary>Someone asks for my exe. A couple of uploads at a time; the others ask again later (or someone else).</summary>
     private void ReceiveUpdateRequest(WireHeader header, Contact sender)
     {
-        if (_ownSignature is not { } signature || header.Text != ServableVersion || _uploads >= MaxUploads)
+        if (ServableVersion is null || header.Text != ServableVersion || _uploads >= MaxUploads)
         {
             return;
         }
@@ -81,7 +71,6 @@ public sealed partial class ChatService
             FileName = Path.GetFileName(Updater.ExePath),
             FileSize = new FileInfo(Updater.ExePath!).Length,
             Text = ServableVersion,
-            Signature = Convert.ToBase64String(signature),
         };
         _knownMessageIds.Add(reply.Id);
         Interlocked.Increment(ref _uploads);
@@ -119,23 +108,13 @@ public sealed partial class ChatService
             return;
         }
 
-        byte[] signature;
-        try
-        {
-            signature = Convert.FromBase64String(header.Signature ?? "");
-        }
-        catch (FormatException)
-        {
-            signature = [];
-        }
-
         _ = Task.Run(() =>
         {
             Version? staged = null;
             var blocked = false;
             try
             {
-                staged = Updater.Stage(filePath, signature);
+                staged = Updater.Stage(filePath);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -161,7 +140,7 @@ public sealed partial class ChatService
                 }
                 else
                 {
-                    _badUpdates.Add((request.Ip, request.Version)); // bad signature or not newer: don't ask them again
+                    _badUpdates.Add((request.Ip, request.Version)); // not a Mini Local Chat exe, or not newer: don't ask them again
                 }
             });
         });

@@ -46,7 +46,7 @@ public sealed class AppSettings
     /// <summary>Others see me as Away after this many minutes without the mouse moving (0 = only when locked).</summary>
     public int AwayAfterMinutes { get; set; } = 5;
 
-    /// <summary>Install newer versions (signed releases) that other computers on the network have.</summary>
+    /// <summary>Install newer versions that other computers on the network have.</summary>
     public bool AutoUpdate { get; set; } = true;
 
     /// <summary>The floating panel stays open (doesn't hide when the mouse leaves).</summary>

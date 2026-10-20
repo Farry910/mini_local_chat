@@ -89,8 +89,6 @@ public sealed class WireHeader
     /// <summary>"group": one of <see cref="GroupActions"/>.</summary>
     public string? Action { get; set; }
 
-    /// <summary>"update": the release signature of the exe in the payload (base64).</summary>
-    public string? Signature { get; set; }
 }
 
 /// <summary>
@@ -120,7 +118,7 @@ public static class WireTypes
     /// <summary>"Please send me your app, version <c>Text</c>" (LAN auto-update).</summary>
     public const string UpdateGet = "update-get";
 
-    /// <summary>The app exe (payload), its version in <c>Text</c> and release signature in <c>Signature</c>.</summary>
+    /// <summary>The app exe (payload), its version in <c>Text</c>.</summary>
     public const string Update = "update";
 }
 
@@ -169,6 +167,6 @@ public sealed class PresencePacket
     /// <summary>Running but away: no mouse movement for a while, or the screen is locked.</summary>
     public bool Away { get; set; }
 
-    /// <summary>The signed app version this computer can hand out (LAN auto-update), or null.</summary>
+    /// <summary>The app version this computer can hand out (LAN auto-update), or null.</summary>
     public string? Update { get; set; }
 }

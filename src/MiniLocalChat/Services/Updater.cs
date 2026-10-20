@@ -1,14 +1,11 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
 using MiniLocalChat.Infrastructure;
 
 namespace MiniLocalChat.Services;
 
 /// <summary>
-/// The file side of the LAN auto-update. A published release is one exe plus "MiniLocalChat.exe.sig",
-/// an ECDSA signature made with the release key (tools\UpdateKey.cs). An update from another computer
-/// is only used if its signature checks out against the public key built in here and it's a higher
-/// version, so nobody on the network can push their own program or an old version.
+/// The file side of the LAN auto-update. A release is just the published exe. An exe from another
+/// computer is used if it is a Mini Local Chat exe (product name) with a higher version than mine.
 ///
 /// Installing: the new exe is staged as "MiniLocalChat.exe.new"; then the running exe is renamed to
 /// ".old" (Windows allows renaming a running exe), the new one takes its name, and the app restarts.
@@ -16,9 +13,6 @@ namespace MiniLocalChat.Services;
 /// </summary>
 public static class Updater
 {
-    /// <summary>ECDSA P-256 public key (SubjectPublicKeyInfo) of the release signing key.</summary>
-    private const string PublicKey =
-        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2BuMcCuUBewADX2E193Er6ebAD1m7dyKs4f2U2deRvJ0DcIDKwN1CpiZmL8RY0M3KefqBi3J5Dxu8rCJkBwU7A==";
 
     public static readonly Version CurrentVersion = Normalize(typeof(Updater).Assembly.GetName().Version);
 
@@ -26,75 +20,39 @@ public static class Updater
 
     /// <summary>
     /// A published single-file exe (not a development build, which is a small launcher next to many DLLs
-    /// and can neither be handed out nor replaced by one file).
+    /// and can neither be handed out nor replaced by one file). An empty assembly Location is exactly
+    /// what marks a single-file app, so the IL3000 warning about it is expected here.
     /// </summary>
+#pragma warning disable IL3000
     public static bool IsInstalledBuild =>
         ExePath is not null && string.IsNullOrEmpty(typeof(Updater).Assembly.Location);
-
-    private static string SignaturePath => ExePath + ".sig";
+#pragma warning restore IL3000
 
     private static string StagedPath => ExePath + ".new";
-
-    private static string StagedSignaturePath => ExePath + ".sig.new";
 
     private static string OldPath => ExePath + ".old";
 
     public static Version? Parse(string? text) =>
         Version.TryParse(text, out var version) ? Normalize(version) : null;
 
-    /// <summary>My own exe's signature if it's a signed release (so I can pass it on to others), else null.</summary>
-    public static byte[]? ReadOwnSignature()
-    {
-        try
-        {
-            if (!IsInstalledBuild || !File.Exists(SignaturePath))
-            {
-                return null;
-            }
-
-            var signature = Convert.FromBase64String(File.ReadAllText(SignaturePath).Trim());
-            return Verify(ExePath!, signature) ? signature : null;
-        }
-        catch (Exception ex) when (ex is IOException or FormatException or UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
-
-    public static bool Verify(string path, byte[] signature)
-    {
-        try
-        {
-            using var key = ECDsa.Create();
-            key.ImportSubjectPublicKeyInfo(Convert.FromBase64String(PublicKey), out _);
-            using var file = File.OpenRead(path);
-            return key.VerifyData(file, signature, HashAlgorithmName.SHA256);
-        }
-        catch (Exception ex) when (ex is IOException or CryptographicException or UnauthorizedAccessException)
-        {
-            return false;
-        }
-    }
-
     /// <summary>
-    /// Checks a downloaded exe (signature, and a version higher than mine) and puts it next to mine,
-    /// ready to install. Returns its version, or null if it isn't a valid update (the download is deleted).
+    /// Checks a downloaded exe (a Mini Local Chat exe, with a version higher than mine) and puts it next to
+    /// mine, ready to install. Returns its version, or null if it isn't an update (the download is deleted).
     /// Throws if the app folder isn't writable.
     /// </summary>
-    public static Version? Stage(string downloaded, byte[] signature)
+    public static Version? Stage(string downloaded)
     {
-        if (!IsInstalledBuild || !Verify(downloaded, signature)
-            || Parse(FileVersionInfo.GetVersionInfo(downloaded).FileVersion) is not { } version || version <= CurrentVersion)
+        var info = FileVersionInfo.GetVersionInfo(downloaded);
+        if (!IsInstalledBuild || info.ProductName != AppInfo.Name
+            || Parse(info.FileVersion) is not { } version || version <= CurrentVersion)
         {
             TryDelete(downloaded);
             return null;
         }
 
         File.Move(downloaded, StagedPath, overwrite: true);
-        File.WriteAllText(StagedSignaturePath, Convert.ToBase64String(signature));
         return version;
     }
-
     /// <summary>Swaps the staged exe in. The running app keeps going until it restarts.</summary>
     public static bool Install()
     {
@@ -117,7 +75,6 @@ public static class Updater
                 throw;
             }
 
-            File.Move(StagedSignaturePath, SignaturePath, overwrite: true);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -151,7 +108,7 @@ public static class Updater
 
         TryDelete(OldPath);
         TryDelete(StagedPath);
-        TryDelete(StagedSignaturePath);
+        TryDelete(ExePath + ".sig"); // from the earlier, signed updater
     }
 
     /// <summary>Waits for the process that just installed this update to finish closing.</summary>

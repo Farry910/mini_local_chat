@@ -116,7 +116,7 @@ public partial class App : Application
             Log.Error("Shortcut", new InvalidOperationException(hotkeyError));
         }
 
-        // LAN auto-update: a newer signed version arrived from another computer.
+        // LAN auto-update: a newer version arrived from another computer.
         Chat.UpdateStaged += OnUpdateStaged;
 
         if (startInTray)

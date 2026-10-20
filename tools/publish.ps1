@@ -1,11 +1,10 @@
-# Publishes Mini Local Chat as one signed exe, ready to spread over the LAN auto-update.
+# Publishes Mini Local Chat as one exe, ready to spread over the LAN auto-update.
 #
 #   powershell -ExecutionPolicy Bypass -File tools\publish.ps1
 #
 # Bump <Version> in src\MiniLocalChat\MiniLocalChat.csproj first: computers only install a HIGHER version.
-# Then run the published exe (publish\MiniLocalChat.exe, with MiniLocalChat.exe.sig next to it) on any
-# one computer; the others pick it up from there, and pass it on.
-# Signing needs the private key made once with:  dotnet run tools/UpdateKey.cs -- new
+# Then run the published exe (publish\MiniLocalChat.exe) on any one computer; the others pick it up
+# from there, and pass it on.
 param([string]$Output = "publish")
 
 $ErrorActionPreference = "Stop"
@@ -18,8 +17,5 @@ dotnet publish src/MiniLocalChat/MiniLocalChat.csproj -c Release -r win-x64 --se
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 Get-ChildItem $Output -Filter *.pdb | Remove-Item  # native debug symbols (~95 MB), not needed to run
 
-dotnet run tools/UpdateKey.cs -- sign (Join-Path $Output "MiniLocalChat.exe")
-if ($LASTEXITCODE -ne 0) { throw "signing failed" }
-
 $version = (Get-Item (Join-Path $Output "MiniLocalChat.exe")).VersionInfo.FileVersion
-Write-Host "Published and signed version $version in $Output\ (MiniLocalChat.exe + MiniLocalChat.exe.sig)"
+Write-Host "Published version ${version}: $Output\MiniLocalChat.exe"
