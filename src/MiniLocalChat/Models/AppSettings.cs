@@ -40,11 +40,14 @@ public sealed class AppSettings
     /// including Chrome Remote Desktop in full screen.</summary>
     public bool RippleSkipFullScreen { get; set; }
 
-    /// <summary>While messages are unread, a small ripple at the mouse pointer every <c>ReminderSeconds</c>.</summary>
+    /// <summary>While messages are unread, a small ripple at the mouse pointer every 10 seconds.</summary>
     public bool RippleReminder { get; set; } = true;
 
     /// <summary>Others see me as Away after this many minutes without the mouse moving (0 = only when locked).</summary>
     public int AwayAfterMinutes { get; set; } = 5;
+
+    /// <summary>Install newer versions (signed releases) that other computers on the network have.</summary>
+    public bool AutoUpdate { get; set; } = true;
 
     /// <summary>The floating panel stays open (doesn't hide when the mouse leaves).</summary>
     public bool FloatingPinned { get; set; }

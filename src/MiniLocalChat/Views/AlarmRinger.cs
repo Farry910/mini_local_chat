@@ -34,6 +34,9 @@ public sealed class AlarmRinger
     private readonly DispatcherTimer _wave = new() { Interval = WaveEvery };
     private MediaPlayer? _player;
 
+    /// <summary>An alarm or timer card is up.</summary>
+    public bool IsRinging => _ringing.Count > 0;
+
     public AlarmRinger(AlarmService alarms, TimerService timers, Func<RippleController?> ripples)
     {
         _ripples = ripples;

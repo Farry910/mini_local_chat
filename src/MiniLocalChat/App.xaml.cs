@@ -16,6 +16,7 @@ namespace MiniLocalChat;
 ///   --tray          start hidden in the tray (used by "Start with Windows")
 ///   --data &lt;dir&gt;    use another data folder
 ///   --bind &lt;ip&gt;     listen/send only on this IP and use it as identity (e.g. two test instances on 127.0.0.1 / 127.0.0.2)
+///   --after-update &lt;pid&gt;  (internal) restarted into a new version: wait for the old process to close first
 /// </summary>
 public partial class App : Application
 {
@@ -27,6 +28,9 @@ public partial class App : Application
     private TrayIcon? _tray;
     private Mutex? _instanceMutex;
     private EventWaitHandle? _showSignal;
+    private string[] _args = [];
+    private DispatcherTimer? _updateTimer;
+    private bool _installed;
 
     public static ChatService Chat { get; private set; } = null!;
 
@@ -46,7 +50,10 @@ public partial class App : Application
         base.OnStartup(e);
         DispatcherUnhandledException += OnUnhandledException;
 
+        _args = e.Args;
         var startInTray = e.Args.Contains("--tray", StringComparer.OrdinalIgnoreCase);
+        var afterUpdate = ArgValue(e.Args, "--after-update");
+        Updater.WaitForExit(afterUpdate); // the previous version still holds the single-instance lock
         AppPaths.Initialize(ArgValue(e.Args, "--data"));
         if (!AcquireSingleInstance())
         {
@@ -109,6 +116,9 @@ public partial class App : Application
             Log.Error("Shortcut", new InvalidOperationException(hotkeyError));
         }
 
+        // LAN auto-update: a newer signed version arrived from another computer.
+        Chat.UpdateStaged += OnUpdateStaged;
+
         if (startInTray)
         {
             EnterTrayMode();
@@ -117,6 +127,67 @@ public partial class App : Application
         {
             ShowMain();
         }
+
+        if (afterUpdate is not null)
+        {
+            _tray?.ShowBalloon($"Mini Local Chat was updated to {Updater.CurrentVersion.ToString(3)}",
+                "The new version came from another computer on your network.");
+        }
+    }
+
+    /// <summary>Installs the new version and restarts as soon as nobody is using the app.</summary>
+    private void OnUpdateStaged()
+    {
+        _updateTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(15), DispatcherPriority.Background, (_, _) => TryRestartIntoUpdate(), Dispatcher);
+        _updateTimer.Start();
+        TryRestartIntoUpdate();
+    }
+
+    private void TryRestartIntoUpdate()
+    {
+        // Not while I'm in the main window or the floating panel (unless I walked away), an alarm rings, or a dialog is open.
+        var busy = (_main is { IsVisible: true } && !Chat.Me.IsAway) || _floating?.IsPanelInUse == true
+                   || _alarmRinger?.IsRinging == true || DialogGuard.IsOpen || IsExiting;
+        if (busy || Chat.StagedUpdate is null)
+        {
+            return;
+        }
+
+        _updateTimer?.Stop();
+        if (!Updater.Install())
+        {
+            return; // logged; this version keeps running
+        }
+
+        _installed = true;
+        var args = new List<string>();
+        for (var i = 0; i < _args.Length; i++)
+        {
+            if (_args[i].Equals("--after-update", StringComparison.OrdinalIgnoreCase))
+            {
+                i++; // and its value
+            }
+            else if (!_args[i].Equals("--tray", StringComparison.OrdinalIgnoreCase))
+            {
+                args.Add(_args[i]);
+            }
+        }
+
+        if (_main is not { IsVisible: true })
+        {
+            args.Add("--tray");
+        }
+
+        try
+        {
+            Updater.Restart(args);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Restarting after update", ex);
+        }
+
+        ExitApp();
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -221,6 +292,13 @@ public partial class App : Application
         }
 
         IsExiting = true;
+
+        // Quitting with an update waiting: it's there next time.
+        if (!_installed && Chat.StagedUpdate is not null)
+        {
+            Updater.Install();
+        }
+
         _hotkey?.Dispose();
         _floating?.Exit();
         Chat.Shutdown();

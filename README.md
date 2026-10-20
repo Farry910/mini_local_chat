@@ -44,14 +44,27 @@ dotnet build MiniLocalChat.slnx -c Release
 
 On first start Windows Firewall asks whether to allow the app on the network. Allow it, or the other computers can't see or reach it. If the prompt was dismissed, use **Settings → Allow through firewall** (asks for admin rights) on that computer.
 
-To hand it to other PCs without installing .NET, publish one self-contained, compressed `.exe` (about 70 MB):
+To hand it to other PCs without installing .NET, publish one self-contained, compressed `.exe` (about 85 MB), signed for the auto-update:
 
 ```powershell
-dotnet publish src/MiniLocalChat/MiniLocalChat.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o publish
+powershell -ExecutionPolicy Bypass -File tools\publish.ps1
 ```
 
-`publish\MiniLocalChat.exe` is the only file to copy.
+It writes `publish\MiniLocalChat.exe` and `publish\MiniLocalChat.exe.sig`. For a first install, copy both into a folder the user can write to (e.g. `%LOCALAPPDATA%\MiniLocalChat`), not Program Files, so the app can update itself.
 
+### Auto-update over the LAN (no internet)
+
+Every computer tells the others which version it has. When one sees a higher version, it downloads it from that computer, checks it, and restarts into it as soon as nobody is using the app (main window closed to the tray, floating panel not in use, no alarm ringing, or you're Away); or when you quit. Each updated computer passes the new version on, so a release spreads by itself. Settings → *Updates* turns it off for one computer.
+
+To release a new version:
+
+1. Raise `<Version>` in `src/MiniLocalChat/MiniLocalChat.csproj` (only a **higher** version is installed).
+2. Run `tools\publish.ps1`.
+3. Start the new `publish\MiniLocalChat.exe` (with its `.sig` next to it) on any one computer that's on the network. The rest follows.
+
+**Signing.** Only exes signed with the release key are accepted, so nobody else on the network can push a program (or an old version) to everyone. The private key was created once with `dotnet run tools/UpdateKey.cs -- new` and is in `%USERPROFILE%\.minilocalchat\update-signing-key.pem` on the publishing computer. **Back it up and keep it private**: without it no further updates can be signed (a new key means copying a build with the new public key to every computer by hand once). The public key is built into `Services/Updater.cs`. Development builds (`dotnet run` / `bin\`) neither update nor hand out updates.
+
+Computers on version 1.4 or older don't have the updater yet: give them 1.5 by hand once.
 ### Command-line options
 
 | Option | Purpose |

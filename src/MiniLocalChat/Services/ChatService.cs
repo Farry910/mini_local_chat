@@ -135,7 +135,7 @@ public sealed partial class ChatService : ObservableObject
         _server.Start();
 
         _presence = new PresenceService(BindAddress, Settings.UdpPort,
-            () => new PresencePacket { Nick = Me.Nickname, Colors = MyColors(), Avatar = Me.AvatarId, Away = Me.IsAway }, () => _knownIps,
+            () => new PresencePacket { Nick = Me.Nickname, Colors = MyColors(), Avatar = Me.AvatarId, Away = Me.IsAway, Update = ServableVersion }, () => _knownIps,
             (ip, packet) => _ui.InvokeAsync(() => HandlePresence(ip, packet)));
         _presence.Start();
 
@@ -165,6 +165,7 @@ public sealed partial class ChatService : ObservableObject
 
         _maintenanceTimer.Start();
         StartAwayDetection();
+        StartUpdates();
         _presence.Announce(PresenceKinds.Hello, sweepSubnet: true);
     }
 
@@ -529,6 +530,12 @@ public sealed partial class ChatService : ObservableObject
             case WireTypes.Avatar:
                 ReceiveAvatar(header, packet.FilePath);
                 return true;
+            case WireTypes.UpdateGet:
+                ReceiveUpdateRequest(header, sender);
+                return true;
+            case WireTypes.Update:
+                ReceiveUpdate(header, sender, packet.FilePath);
+                return true;
         }
 
         ScheduleSave();
@@ -673,6 +680,7 @@ public sealed partial class ChatService : ObservableObject
 
         MarkSeen(contact);
         contact.IsAway = packet.Away;
+        ConsiderUpdate(contact, packet.Update);
         if (packet.Kind == PresenceKinds.Hello)
         {
             _presence?.SendTo(ip, PresenceKinds.Here);

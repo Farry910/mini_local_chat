@@ -84,6 +84,11 @@
             <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
                        Text="Also Away while the screen is locked. 0 = only when locked." />
 
+            <TextBlock Style="{StaticResource FieldLabel}" Text="Updates" />
+            <CheckBox x:Name="AutoUpdateBox" VerticalContentAlignment="Center" FontSize="13"
+                      Content="Get new versions from other computers on the network automatically" />
+            <TextBlock x:Name="UpdateNote" Margin="22,4,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" />
+
             <TextBlock Style="{StaticResource FieldLabel}" Text="Show / hide shortcut" />
             <DockPanel>
                 <Button DockPanel.Dock="Right" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" MinWidth="0" Padding="12,5"

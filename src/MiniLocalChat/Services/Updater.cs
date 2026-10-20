@@ -1,0 +1,190 @@
+using System.Diagnostics;
+using System.Security.Cryptography;
+using MiniLocalChat.Infrastructure;
+
+namespace MiniLocalChat.Services;
+
+/// <summary>
+/// The file side of the LAN auto-update. A published release is one exe plus "MiniLocalChat.exe.sig",
+/// an ECDSA signature made with the release key (tools\UpdateKey.cs). An update from another computer
+/// is only used if its signature checks out against the public key built in here and it's a higher
+/// version, so nobody on the network can push their own program or an old version.
+///
+/// Installing: the new exe is staged as "MiniLocalChat.exe.new"; then the running exe is renamed to
+/// ".old" (Windows allows renaming a running exe), the new one takes its name, and the app restarts.
+/// The leftover ".old" is deleted on the next start.
+/// </summary>
+public static class Updater
+{
+    /// <summary>ECDSA P-256 public key (SubjectPublicKeyInfo) of the release signing key.</summary>
+    private const string PublicKey =
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2BuMcCuUBewADX2E193Er6ebAD1m7dyKs4f2U2deRvJ0DcIDKwN1CpiZmL8RY0M3KefqBi3J5Dxu8rCJkBwU7A==";
+
+    public static readonly Version CurrentVersion = Normalize(typeof(Updater).Assembly.GetName().Version);
+
+    public static string? ExePath { get; } = Environment.ProcessPath;
+
+    /// <summary>
+    /// A published single-file exe (not a development build, which is a small launcher next to many DLLs
+    /// and can neither be handed out nor replaced by one file).
+    /// </summary>
+    public static bool IsInstalledBuild =>
+        ExePath is not null && string.IsNullOrEmpty(typeof(Updater).Assembly.Location);
+
+    private static string SignaturePath => ExePath + ".sig";
+
+    private static string StagedPath => ExePath + ".new";
+
+    private static string StagedSignaturePath => ExePath + ".sig.new";
+
+    private static string OldPath => ExePath + ".old";
+
+    public static Version? Parse(string? text) =>
+        Version.TryParse(text, out var version) ? Normalize(version) : null;
+
+    /// <summary>My own exe's signature if it's a signed release (so I can pass it on to others), else null.</summary>
+    public static byte[]? ReadOwnSignature()
+    {
+        try
+        {
+            if (!IsInstalledBuild || !File.Exists(SignaturePath))
+            {
+                return null;
+            }
+
+            var signature = Convert.FromBase64String(File.ReadAllText(SignaturePath).Trim());
+            return Verify(ExePath!, signature) ? signature : null;
+        }
+        catch (Exception ex) when (ex is IOException or FormatException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    public static bool Verify(string path, byte[] signature)
+    {
+        try
+        {
+            using var key = ECDsa.Create();
+            key.ImportSubjectPublicKeyInfo(Convert.FromBase64String(PublicKey), out _);
+            using var file = File.OpenRead(path);
+            return key.VerifyData(file, signature, HashAlgorithmName.SHA256);
+        }
+        catch (Exception ex) when (ex is IOException or CryptographicException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks a downloaded exe (signature, and a version higher than mine) and puts it next to mine,
+    /// ready to install. Returns its version, or null if it isn't a valid update (the download is deleted).
+    /// Throws if the app folder isn't writable.
+    /// </summary>
+    public static Version? Stage(string downloaded, byte[] signature)
+    {
+        if (!IsInstalledBuild || !Verify(downloaded, signature)
+            || Parse(FileVersionInfo.GetVersionInfo(downloaded).FileVersion) is not { } version || version <= CurrentVersion)
+        {
+            TryDelete(downloaded);
+            return null;
+        }
+
+        File.Move(downloaded, StagedPath, overwrite: true);
+        File.WriteAllText(StagedSignaturePath, Convert.ToBase64String(signature));
+        return version;
+    }
+
+    /// <summary>Swaps the staged exe in. The running app keeps going until it restarts.</summary>
+    public static bool Install()
+    {
+        if (!IsInstalledBuild || !File.Exists(StagedPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            TryDelete(OldPath);
+            File.Move(ExePath!, OldPath);
+            try
+            {
+                File.Move(StagedPath, ExePath!);
+            }
+            catch
+            {
+                File.Move(OldPath, ExePath!); // put mine back
+                throw;
+            }
+
+            File.Move(StagedSignaturePath, SignaturePath, overwrite: true);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Error("Installing update", ex);
+            return false;
+        }
+    }
+
+    /// <summary>Starts the (new) exe with the same options, once this process has exited.</summary>
+    public static void Restart(IEnumerable<string> args)
+    {
+        var start = new ProcessStartInfo(ExePath!) { UseShellExecute = false };
+        foreach (var arg in args)
+        {
+            start.ArgumentList.Add(arg);
+        }
+
+        start.ArgumentList.Add("--after-update");
+        start.ArgumentList.Add(Environment.ProcessId.ToString());
+        Process.Start(start);
+    }
+
+    /// <summary>On start: the previous exe is no longer needed; a half-done download is dropped.</summary>
+    public static void CleanUp()
+    {
+        if (!IsInstalledBuild)
+        {
+            return;
+        }
+
+        TryDelete(OldPath);
+        TryDelete(StagedPath);
+        TryDelete(StagedSignaturePath);
+    }
+
+    /// <summary>Waits for the process that just installed this update to finish closing.</summary>
+    public static void WaitForExit(string? processId)
+    {
+        if (!int.TryParse(processId, out var id))
+        {
+            return;
+        }
+
+        try
+        {
+            using var previous = Process.GetProcessById(id);
+            previous.WaitForExit(TimeSpan.FromSeconds(20));
+        }
+        catch (ArgumentException)
+        {
+            // Already gone.
+        }
+    }
+
+    // "1.4" and "1.4.0.0" are the same version.
+    private static Version Normalize(Version? version) =>
+        version is null ? new Version(0, 0, 0) : new Version(version.Major, Math.Max(0, version.Minor), Math.Max(0, version.Build));
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+}

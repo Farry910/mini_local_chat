@@ -72,6 +72,9 @@ public sealed class FloatingController
     /// <summary>Pin mode: the panel stays open next to the LED instead of hiding when the mouse leaves.</summary>
     public bool Pinned => App.Chat.Settings.FloatingPinned;
 
+    /// <summary>The floating panel is open and being used (focused or under the mouse).</summary>
+    public bool IsPanelInUse => _mini.IsVisible && (_mini.IsActive || _mini.IsMouseOver);
+
     private void TogglePin()
     {
         App.Chat.Settings.FloatingPinned = !Pinned;
