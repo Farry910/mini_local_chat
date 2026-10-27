@@ -92,7 +92,7 @@ public partial class Avatar : UserControl
         if (CanView)
         {
             e.Handled = true;
-            AvatarViewer.Show(Window.GetWindow(this), Person!);
+            ImageViewer.Show(Window.GetWindow(this), Person!);
         }
     }
 

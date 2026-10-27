@@ -1277,7 +1277,14 @@ public partial class ChatView : UserControl
         }
     }
 
-    private void OnImageClick(object sender, MouseButtonEventArgs e) => OpenFile(MessageOf(sender));
+    /// <summary>Pictures and GIFs open in the app's own viewer; anything it can't show opens in Windows' app for it.</summary>
+    private void OnImageClick(object sender, MouseButtonEventArgs e)
+    {
+        if (MessageOf(sender) is { } message && !ImageViewer.Show(Window.GetWindow(this), Conversation, message))
+        {
+            OpenFile(message);
+        }
+    }
 
     private void OnOpenAttachment(object sender, RoutedEventArgs e) => OpenFile(MessageOf(sender));
 
