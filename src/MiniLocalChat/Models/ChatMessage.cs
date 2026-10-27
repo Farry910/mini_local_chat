@@ -89,8 +89,18 @@ public sealed class ChatMessage : ObservableObject
     public string? LocalPath
     {
         get => _localPath;
-        set => Set(ref _localPath, value);
+        set
+        {
+            if (Set(ref _localPath, value))
+            {
+                OnPropertyChanged(nameof(IsFileRemoved));
+            }
+        }
     }
+
+    /// <summary>A picture or file whose copy on this computer was deleted to free up space (the message stays).</summary>
+    [JsonIgnore]
+    public bool IsFileRemoved => Kind is MessageKind.Image or MessageKind.File && !IsDeleted && LocalPath is null;
 
     public ReplyInfo? ReplyTo { get; set; }
 
@@ -113,6 +123,7 @@ public sealed class ChatMessage : ObservableObject
             if (Set(ref _isDeleted, value))
             {
                 OnPropertyChanged(nameof(Preview));
+                OnPropertyChanged(nameof(IsFileRemoved));
                 OnPropertyChanged(nameof(CanEdit));
                 OnPropertyChanged(nameof(CanDelete));
                 OnPropertyChanged(nameof(HasActions));

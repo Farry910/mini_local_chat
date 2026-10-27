@@ -27,6 +27,41 @@ public sealed class PathToUriConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>
+/// A small still picture (a GIF's first frame) for panel tiles, decoded at the width in pixels given as
+/// the converter parameter. Not cached: tiles only exist while the panel is open.
+/// </summary>
+public sealed class ThumbnailConverter : IValueConverter
+{
+    public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not string path || !File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+            bitmap.DecodePixelWidth = int.TryParse(parameter as string, out var width) ? width : 160;
+            bitmap.UriSource = new Uri(path);
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or InvalidOperationException or UriFormatException)
+        {
+            return null;
+        }
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Visible when the value is set (e.g. a message has a reply quote).</summary>
 public sealed class NotNullToVisibilityConverter : IValueConverter
 {
@@ -164,11 +199,20 @@ public sealed class FileSizeConverter : IValueConverter
         throw new NotSupportedException();
 }
 
-/// <summary>Loads an image file without locking it, downscaling large pictures.</summary>
+/// <summary>
+/// Loads an image file without locking it, downscaling large pictures. Recently shown pictures stay
+/// decoded (up to <see cref="CacheBytes"/>) so scrolling back is instant.
+/// </summary>
 public sealed class PathToImageConverter : IValueConverter
 {
     private const int MaxDecodeWidth = 640;
-    private static readonly Dictionary<string, ImageSource> Cache = new(StringComparer.OrdinalIgnoreCase);
+    private const long CacheBytes = 48L * 1024 * 1024;
+
+    private static readonly LruCache<string, BitmapSource> Cache =
+        new(CacheBytes, b => (long)b.PixelWidth * b.PixelHeight * 4, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Drops the decoded pictures (e.g. while the app sits in the tray).</summary>
+    public static void ClearCache() => Cache.Clear();
 
     public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
@@ -177,7 +221,7 @@ public sealed class PathToImageConverter : IValueConverter
             return null;
         }
 
-        if (Cache.TryGetValue(path, out var cached))
+        if (Cache.TryGet(path, out var cached))
         {
             return cached;
         }
@@ -203,13 +247,7 @@ public sealed class PathToImageConverter : IValueConverter
 
             bitmap.EndInit();
             bitmap.Freeze();
-
-            if (Cache.Count > 200)
-            {
-                Cache.Clear();
-            }
-
-            Cache[path] = bitmap;
+            Cache.Add(path, bitmap);
             return bitmap;
         }
         catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or InvalidOperationException or UriFormatException)

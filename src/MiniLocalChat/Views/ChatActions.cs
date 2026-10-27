@@ -67,7 +67,8 @@ public static class ChatActions
     public static void ClearHistory(Conversation conversation)
     {
         if (Confirm($"Clear all messages in “{conversation.Title}”?",
-                "Every message, picture and reaction in this chat is removed from this computer. The others keep their copy. Received files stay in your Files folder."))
+                "Every message, picture and reaction in this chat is removed from this computer. The others keep their copy. "
+                + "Received files move to the storage trash (Settings → Manage storage), which is emptied after 30 days."))
         {
             App.Chat.ClearHistory(conversation);
         }

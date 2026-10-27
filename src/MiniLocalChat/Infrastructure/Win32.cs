@@ -44,6 +44,16 @@ internal static class Win32
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool AllowSetForegroundWindow(int processId);
 
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr minimum, IntPtr maximum);
+
+    /// <summary>Hands the memory the app isn't touching back to Windows; it's paged back in if needed.</summary>
+    public static void TrimWorkingSet() => SetProcessWorkingSetSize(GetCurrentProcess(), -1, -1);
+
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
     private static extern int GetWindowLong(IntPtr hwnd, int index);
 

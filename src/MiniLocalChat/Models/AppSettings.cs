@@ -57,6 +57,12 @@ public sealed class AppSettings
 
     public bool TrayHintShown { get; set; }
 
+    /// <summary>Files no chat uses any more (the "trash") are deleted once they've been unused this long; false = only on request.</summary>
+    public bool AutoEmptyTrash { get; set; } = true;
+
+    /// <summary>Every day, delete the copies of pictures and files in chats older than this many days (0 = keep them).</summary>
+    public int DeleteFilesAfterDays { get; set; }
+
     /// <summary>Group chats I left: their messages are ignored unless someone adds me back.</summary>
     public List<string> LeftGroupIds { get; set; } = [];
 }

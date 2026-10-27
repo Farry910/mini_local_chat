@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
@@ -61,9 +62,6 @@ public partial class ChatView : UserControl
     private string _draftBeforeEdit = "";
     private bool _watchingWindow;
     private bool _pinnedToBottom = true;
-    private ListCollectionView? _savedGifs;
-    private ListCollectionView? _stickers;
-    private ListCollectionView? _tgsStickers;
     private bool _restoringDraft;
     private Storyboard? _typingDots;
 
@@ -506,7 +504,7 @@ public partial class ChatView : UserControl
 
             if (ClipboardImage.HasPicture(data) && ClipboardImage.ReadPng(data) is { } png)
             {
-                var dir = Path.Combine(AppPaths.FilesDir, "pasted");
+                var dir = AppPaths.PastedDir;
                 Directory.CreateDirectory(dir);
                 var path = Path.Combine(dir, $"Screenshot_{DateTime.Now:yyyy-MM-dd_HH-mm-ss_fff}.png");
                 File.WriteAllBytes(path, png);
@@ -1037,34 +1035,41 @@ public partial class ChatView : UserControl
     private void OnGifPanelOpened(object? sender, EventArgs e)
     {
         GifFilter.Text = "";
-        _stickers = new ListCollectionView(EmojiStickers.Available().ToList())
-        {
-            Filter = o => o is EmojiSticker s && (GifQuery.Length == 0 || s.Keywords.Contains(GifQuery, StringComparison.CurrentCultureIgnoreCase)),
-        };
-        _savedGifs = new ListCollectionView(GifLibrary.Items)
-        {
-            Filter = o => o is SavedGif gif && (GifQuery.Length == 0 || gif.Name.Contains(GifQuery, StringComparison.CurrentCultureIgnoreCase)),
-        };
-        _tgsStickers = new ListCollectionView(StickerLibrary.Items)
-        {
-            Filter = o => o is SavedSticker s && (GifQuery.Length == 0 || s.Name.Contains(GifQuery, StringComparison.CurrentCultureIgnoreCase)),
-        };
-        TgsGrid.ItemsSource = _tgsStickers;
-        StickerGrid.ItemsSource = _stickers;
-        GifGrid.ItemsSource = _savedGifs;
-        UpdateGifTab();
+        FillGifPanel();
         GifFilter.Focus();
     }
 
-    // Dropping the tiles stops their animations while the panel is closed.
+    // Dropping the tiles frees their pictures and stops their animations while the panel is closed.
     private void OnGifPanelClosed(object? sender, EventArgs e)
     {
         TgsGrid.ItemsSource = null;
         StickerGrid.ItemsSource = null;
         GifGrid.ItemsSource = null;
-        _tgsStickers = null;
-        _stickers = null;
-        _savedGifs = null;
+    }
+
+    /// <summary>
+    /// Puts the (filtered) stickers, emoji and saved GIFs into the panel as rows of tiles; the panel only
+    /// creates the rows on screen, so hundreds of saved GIFs cost no more than a dozen.
+    /// </summary>
+    private void FillGifPanel(bool keepScroll = false)
+    {
+        var query = GifQuery;
+        bool Matches(string text) => query.Length == 0 || text.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+
+        var grid = StickersTab.IsChecked == true ? TgsGrid : EmojiTab.IsChecked == true ? StickerGrid : GifGrid;
+        var offset = keepScroll ? FindDescendants<ScrollViewer>(grid).FirstOrDefault()?.VerticalOffset : null;
+
+        // Smallest tile widths, margins included (see the tile templates); a row's tiles share its width.
+        var width = GifPanel.Width - 18 - SystemParameters.VerticalScrollBarWidth;
+        TgsGrid.ItemsSource = TileRow.Split(StickerLibrary.Items.Where(s => Matches(s.Name)), width, 80);
+        StickerGrid.ItemsSource = TileRow.Split(EmojiStickers.Available().Where(s => Matches(s.Keywords)), width, 64);
+        GifGrid.ItemsSource = TileRow.Split(GifLibrary.Items.Where(g => Matches(g.Name)), width, 100);
+        UpdateGifTab();
+
+        if (offset is { } restore)
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => FindDescendants<ScrollViewer>(grid).FirstOrDefault()?.ScrollToVerticalOffset(restore));
+        }
     }
 
     private void OnGifTabChanged(object sender, RoutedEventArgs e)
@@ -1077,10 +1082,10 @@ public partial class ChatView : UserControl
 
     private void OnGifFilterChanged(object sender, TextChangedEventArgs e)
     {
-        _tgsStickers?.Refresh();
-        _stickers?.Refresh();
-        _savedGifs?.Refresh();
-        UpdateGifTab();
+        if (GifPopup.IsOpen)
+        {
+            FillGifPanel();
+        }
     }
 
     private void UpdateGifTab()
@@ -1095,8 +1100,8 @@ public partial class ChatView : UserControl
         StickerCredit.Visibility = emoji ? Visibility.Visible : Visibility.Collapsed;
         GifFilterHint.Text = stickers ? "Search stickers" : emoji ? "Search emoji" : "Search saved GIFs";
 
-        var view = stickers ? _tgsStickers : emoji ? _stickers : _savedGifs;
-        GifEmpty.Visibility = view is { IsEmpty: true } ? Visibility.Visible : Visibility.Collapsed;
+        var rows = (stickers ? TgsGrid : emoji ? StickerGrid : GifGrid).ItemsSource as ICollection;
+        GifEmpty.Visibility = rows is { Count: 0 } ? Visibility.Visible : Visibility.Collapsed;
         GifEmpty.Text = stickers ? "No stickers match."
             : emoji ? "No emoji match."
             : GifLibrary.Items.Count == 0 ? "No saved GIFs yet. GIFs you send are saved here automatically, or use “Add GIF…”."
@@ -1129,26 +1134,35 @@ public partial class ChatView : UserControl
         {
             e.Handled = true;
             StickerLibrary.Remove(sticker);
-            UpdateGifTab();
+            FillGifPanel(keepScroll: true);
         }
     }
 
-    // Panel tiles show a still frame and animate while hovered.
-    private void OnTileMouseEnter(object sender, MouseEventArgs e) => TileAnimator(sender)?.Play();
+    // Panel tiles show a still picture; the GIF itself is only loaded and played while the tile is hovered.
+    private void OnTileMouseEnter(object sender, MouseEventArgs e)
+    {
+        var path = (sender as FrameworkElement)?.DataContext switch
+        {
+            SavedGif gif => gif.Path,
+            EmojiSticker sticker => sticker.Path,
+            _ => null,
+        };
+        if (TilePlayer(sender) is { } player && path is not null && File.Exists(path))
+        {
+            AnimationBehavior.SetSourceUri(player, new Uri(path));
+        }
+    }
 
     private void OnTileMouseLeave(object sender, MouseEventArgs e)
     {
-        if (TileAnimator(sender) is { } animator)
+        if (TilePlayer(sender) is { } player)
         {
-            animator.Pause();
-            animator.Rewind();
+            AnimationBehavior.SetSourceUri(player, null);
         }
     }
 
-    private static Animator? TileAnimator(object sender) =>
-        sender is DependencyObject tile && FindDescendants<Image>(tile).FirstOrDefault() is { } image
-            ? AnimationBehavior.GetAnimator(image)
-            : null;
+    private static Image? TilePlayer(object sender) =>
+        sender is DependencyObject tile ? FindDescendants<Image>(tile).FirstOrDefault(i => i.Name == "Player") : null;
 
     private void OnGifPicked(object sender, MouseButtonEventArgs e)
     {
@@ -1165,7 +1179,7 @@ public partial class ChatView : UserControl
         if (sender is FrameworkElement { DataContext: SavedGif gif })
         {
             GifLibrary.Remove(gif);
-            UpdateGifTab();
+            FillGifPanel(keepScroll: true);
         }
     }
 
@@ -1273,6 +1287,17 @@ public partial class ChatView : UserControl
         {
             Process.Start("explorer.exe", $"/select,\"{path}\"");
         }
+    }
+}
+
+/// <summary>One line of tiles in the sticker / GIF panel, which virtualizes whole lines.</summary>
+public sealed record TileRow(IReadOnlyList<object> Items, int Columns)
+{
+    /// <summary>Lays items out in rows, as many to a row as fit tiles at least <paramref name="tileWidth"/> wide.</summary>
+    public static List<TileRow> Split<T>(IEnumerable<T> items, double width, double tileWidth) where T : class
+    {
+        var columns = Math.Max(1, (int)(width / tileWidth));
+        return items.Chunk(columns).Select(row => new TileRow(row, columns)).ToList();
     }
 }
 

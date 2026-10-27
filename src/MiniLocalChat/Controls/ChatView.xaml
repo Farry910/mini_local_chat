@@ -48,12 +48,14 @@
                     <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,2,0,0" Orientation="Horizontal">
                         <TextBlock FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
                                    Text="{Binding FileSize, Converter={StaticResource FileSize}}" />
-                        <TextBlock Margin="12,0,0,0" FontSize="12">
+                        <TextBlock x:Name="OpenLink" Margin="12,0,0,0" FontSize="12">
                             <Hyperlink Click="OnOpenAttachment" Foreground="{StaticResource AccentBrush}">Open</Hyperlink>
                         </TextBlock>
-                        <TextBlock Margin="10,0,0,0" FontSize="12">
+                        <TextBlock x:Name="FolderLink" Margin="10,0,0,0" FontSize="12">
                             <Hyperlink Click="OnShowInFolder" Foreground="{StaticResource AccentBrush}">Show in folder</Hyperlink>
                         </TextBlock>
+                        <TextBlock x:Name="RemovedNote" Margin="12,0,0,0" FontSize="12" FontStyle="Italic" Visibility="Collapsed"
+                                   Foreground="{StaticResource SubtleTextBrush}" Text="Removed from this computer to save space" />
                     </StackPanel>
                 </Grid>
             </Grid>
@@ -83,6 +85,16 @@
                     <Setter TargetName="ImagePart" Property="Source" Value="{x:Null}" />
                     <Setter TargetName="TgsPart" Property="Visibility" Value="Visible" />
                     <Setter TargetName="TgsPart" Property="Path" Value="{Binding LocalPath}" />
+                </DataTrigger>
+                <!-- The file was deleted to free up space: a file card saying so, whatever it was. -->
+                <DataTrigger Binding="{Binding IsFileRemoved}" Value="True">
+                    <Setter TargetName="ImagePart" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="GifPart" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="TgsPart" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="FilePart" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="OpenLink" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="FolderLink" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="RemovedNote" Property="Visibility" Value="Visible" />
                 </DataTrigger>
                 <!-- Last, so it wins over the kind triggers. -->
                 <DataTrigger Binding="{Binding IsDeleted}" Value="True">
@@ -386,6 +398,106 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Sticker / GIF panel. Its lists are rows of tiles in a virtualizing panel, so only the rows on
+             screen exist; tiles show a still picture and animate only while hovered. -->
+        <Style x:Key="TileRows" TargetType="ItemsControl">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+            <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel" />
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <ScrollViewer CanContentScroll="True" Focusable="False"
+                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemTemplate">
+                <Setter.Value>
+                    <!-- One row; each tile picks its template below by type. -->
+                    <DataTemplate DataType="{x:Type c:TileRow}">
+                        <ItemsControl ItemsSource="{Binding Items}" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1" Columns="{Binding Columns}" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Telegram sticker (.tgs): built-in, sent, saved or added -->
+        <DataTemplate DataType="{x:Type s:SavedSticker}">
+            <Border x:Name="Tile" Width="76" Height="76" Margin="2" Padding="4" CornerRadius="6"
+                    Background="Transparent" Cursor="Hand" ToolTip="{Binding Name}"
+                    MouseLeftButtonUp="OnTgsStickerPicked">
+                <Grid>
+                    <c:StickerPlayer Width="68" Height="68" PlayOnHover="True" Path="{Binding Path}" />
+                    <Button x:Name="RemoveButton" Width="20" Height="20" FontSize="9"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Background="#CCFFFFFF"
+                            Style="{StaticResource IconButton}" Content="&#xE711;"
+                            ToolTip="Remove from my stickers" Visibility="Collapsed" Click="OnRemoveTgsSticker" />
+                </Grid>
+            </Border>
+            <DataTemplate.Triggers>
+                <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Tile" Property="Background" Value="{StaticResource AccentLightBrush}" />
+                </Trigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsMouseOver, ElementName=Tile}" Value="True" />
+                        <Condition Binding="{Binding CanRemove}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="RemoveButton" Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Built-in animated emoji -->
+        <DataTemplate DataType="{x:Type s:EmojiSticker}">
+            <Border Width="60" Height="60" Margin="2" Padding="4" CornerRadius="6" Background="Transparent"
+                    Cursor="Hand" ToolTip="{Binding Name}" MouseEnter="OnTileMouseEnter" MouseLeave="OnTileMouseLeave"
+                    MouseLeftButtonUp="OnStickerPicked">
+                <Grid>
+                    <Image Stretch="Uniform" Source="{Binding Path, Converter={StaticResource Thumbnail}, ConverterParameter=112}" />
+                    <Image x:Name="Player" Stretch="Uniform" gif:AnimationBehavior.RepeatBehavior="Forever" />
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- Saved GIF -->
+        <DataTemplate DataType="{x:Type s:SavedGif}">
+            <Border x:Name="Tile" Height="84" Margin="2" CornerRadius="4" ClipToBounds="True"
+                    Background="{StaticResource PaneBrush}" Cursor="Hand" ToolTip="{Binding Name}"
+                    MouseEnter="OnTileMouseEnter" MouseLeave="OnTileMouseLeave" MouseLeftButtonUp="OnGifPicked">
+                <Grid>
+                    <Image Stretch="UniformToFill" Source="{Binding Path, Converter={StaticResource Thumbnail}, ConverterParameter=240}" />
+                    <Image x:Name="Player" Stretch="UniformToFill" gif:AnimationBehavior.RepeatBehavior="Forever" />
+                    <Button x:Name="RemoveButton" Width="20" Height="20" Margin="3" FontSize="9"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Background="#CCFFFFFF"
+                            Style="{StaticResource IconButton}" Content="&#xE711;"
+                            ToolTip="Remove from saved GIFs" Visibility="Collapsed" Click="OnRemoveGif" />
+                </Grid>
+            </Border>
+            <DataTemplate.Triggers>
+                <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="RemoveButton" Property="Visibility" Value="Visible" />
+                </Trigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid>
@@ -633,96 +745,9 @@
                                 <TextBlock x:Name="StickerCredit" DockPanel.Dock="Bottom" Margin="0,6,0,0" FontSize="10"
                                            Foreground="{StaticResource SubtleTextBrush}" Text="{x:Static s:EmojiStickers.Credit}" />
                                 <Grid>
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                        <Grid>
-                                            <!-- Telegram stickers (.tgs): built-in, sent, saved or added -->
-                                            <ItemsControl x:Name="TgsGrid">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <WrapPanel />
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate DataType="{x:Type s:SavedSticker}">
-                                                        <Border x:Name="Tile" Width="76" Height="76" Margin="2" Padding="4" CornerRadius="6"
-                                                                Background="Transparent" Cursor="Hand" ToolTip="{Binding Name}"
-                                                                MouseLeftButtonUp="OnTgsStickerPicked">
-                                                            <Grid>
-                                                                <c:StickerPlayer Width="68" Height="68" PlayOnHover="True" Path="{Binding Path}" />
-                                                                <Button x:Name="RemoveButton" Width="20" Height="20" FontSize="9"
-                                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Background="#CCFFFFFF"
-                                                                        Style="{StaticResource IconButton}" Content="&#xE711;"
-                                                                        ToolTip="Remove from my stickers" Visibility="Collapsed" Click="OnRemoveTgsSticker" />
-                                                            </Grid>
-                                                        </Border>
-                                                        <DataTemplate.Triggers>
-                                                            <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="Tile" Property="Background" Value="{StaticResource AccentLightBrush}" />
-                                                            </Trigger>
-                                                            <MultiDataTrigger>
-                                                                <MultiDataTrigger.Conditions>
-                                                                    <Condition Binding="{Binding IsMouseOver, ElementName=Tile}" Value="True" />
-                                                                    <Condition Binding="{Binding CanRemove}" Value="True" />
-                                                                </MultiDataTrigger.Conditions>
-                                                                <Setter TargetName="RemoveButton" Property="Visibility" Value="Visible" />
-                                                            </MultiDataTrigger>
-                                                        </DataTemplate.Triggers>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-
-                                            <!-- Built-in animated emoji -->
-                                            <ItemsControl x:Name="StickerGrid" Visibility="Collapsed">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <WrapPanel />
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate DataType="{x:Type s:EmojiSticker}">
-                                                        <Border Width="60" Height="60" Margin="2" Padding="4" CornerRadius="6" Background="Transparent"
-                                                                Cursor="Hand" ToolTip="{Binding Name}" MouseEnter="OnTileMouseEnter" MouseLeave="OnTileMouseLeave"
-                                                                MouseLeftButtonUp="OnStickerPicked">
-                                                            <Image Stretch="Uniform"
-                                                                   gif:AnimationBehavior.SourceUri="{Binding Path, Converter={StaticResource PathToUri}}"
-                                                                   gif:AnimationBehavior.AutoStart="False" gif:AnimationBehavior.RepeatBehavior="Forever" />
-                                                        </Border>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-
-                                            <!-- Saved GIFs -->
-                                            <ItemsControl x:Name="GifGrid" Visibility="Collapsed">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <WrapPanel />
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate DataType="{x:Type s:SavedGif}">
-                                                        <Border x:Name="Tile" Width="100" Height="84" Margin="2" CornerRadius="4" ClipToBounds="True"
-                                                                Background="{StaticResource PaneBrush}" Cursor="Hand" ToolTip="{Binding Name}"
-                                                                MouseEnter="OnTileMouseEnter" MouseLeave="OnTileMouseLeave" MouseLeftButtonUp="OnGifPicked">
-                                                            <Grid>
-                                                                <Image Stretch="UniformToFill"
-                                                                       gif:AnimationBehavior.SourceUri="{Binding Path, Converter={StaticResource PathToUri}}"
-                                                                       gif:AnimationBehavior.AutoStart="False" gif:AnimationBehavior.RepeatBehavior="Forever" />
-                                                                <Button x:Name="RemoveButton" Width="20" Height="20" Margin="3" FontSize="9"
-                                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Background="#CCFFFFFF"
-                                                                        Style="{StaticResource IconButton}" Content="&#xE711;"
-                                                                        ToolTip="Remove from saved GIFs" Visibility="Collapsed" Click="OnRemoveGif" />
-                                                            </Grid>
-                                                        </Border>
-                                                        <DataTemplate.Triggers>
-                                                            <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="RemoveButton" Property="Visibility" Value="Visible" />
-                                                            </Trigger>
-                                                        </DataTemplate.Triggers>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </Grid>
-                                    </ScrollViewer>
+                                    <ItemsControl x:Name="TgsGrid" Style="{StaticResource TileRows}" />
+                                    <ItemsControl x:Name="StickerGrid" Style="{StaticResource TileRows}" Visibility="Collapsed" />
+                                    <ItemsControl x:Name="GifGrid" Style="{StaticResource TileRows}" Visibility="Collapsed" />
                                     <TextBlock x:Name="GifEmpty" Margin="20" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                TextAlignment="Center" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
                                                Visibility="Collapsed" />

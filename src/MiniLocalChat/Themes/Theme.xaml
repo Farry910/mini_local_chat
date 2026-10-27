@@ -36,6 +36,7 @@
     <i:ListTimeConverter x:Key="ListTime" />
     <i:FileSizeConverter x:Key="FileSize" />
     <i:PathToImageConverter x:Key="PathToImage" />
+    <i:ThumbnailConverter x:Key="Thumbnail" />
 
     <!-- Slim scrollbars -->
     <Style x:Key="SlimThumb" TargetType="Thumb">
@@ -160,6 +161,9 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="#F5F5F5" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

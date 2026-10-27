@@ -1,0 +1,164 @@
+<Window x:Class="MiniLocalChat.Views.StorageWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="clr-namespace:MiniLocalChat.Views"
+        Title="Storage and history" Width="540" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" FontFamily="Segoe UI" Background="White">
+    <Window.Resources>
+        <Style x:Key="SectionTitle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabel}">
+            <Setter Property="Margin" Value="0" />
+        </Style>
+        <Style x:Key="SizeText" TargetType="TextBlock">
+            <Setter Property="Margin" Value="12,0,0,0" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Text" Value="…" />
+        </Style>
+        <Style x:Key="Note" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,3,0,0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
+        </Style>
+        <Style x:Key="SmallButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Margin" Value="0,14,0,0" />
+            <Setter Property="Padding" Value="14,12" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"
+                      PreviewMouseWheel="OnScrollerMouseWheel">
+            <StackPanel x:Name="Body" Margin="24,20,24,16">
+                <TextBlock FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextBrush}" Text="Storage and history" />
+                <TextBlock x:Name="TotalText" Margin="0,6,0,0" FontSize="13" TextWrapping="Wrap"
+                           Foreground="{StaticResource SubtleTextBrush}" Text="Measuring…" />
+
+                <!-- The trash: files nothing shows any more -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <DockPanel>
+                            <Button x:Name="EmptyTrashButton" DockPanel.Dock="Right" Margin="12,0,0,0" VerticalAlignment="Top"
+                                    Style="{StaticResource SmallButton}" Content="Empty now" Click="OnEmptyTrash" />
+                            <TextBlock x:Name="UnusedSize" DockPanel.Dock="Right" Style="{StaticResource SizeText}" />
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="Unused files (trash)" />
+                        </DockPanel>
+                        <TextBlock Style="{StaticResource Note}"
+                                   Text="Files no chat shows any more: from deleted messages, cleared or removed chats, old profile pictures and unfinished downloads, plus old log entries." />
+                        <CheckBox x:Name="AutoEmptyBox" Margin="0,8,0,0" VerticalContentAlignment="Center" FontSize="13"
+                                  Content="Empty the trash automatically (files unused for 30 days)"
+                                  Checked="OnAutoEmptyChanged" Unchecked="OnAutoEmptyChanged" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Copies of pictures and files in chats -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock x:Name="ChatFilesSize" DockPanel.Dock="Right" Style="{StaticResource SizeText}" />
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="Pictures and files in chats" />
+                        </DockPanel>
+                        <TextBlock Style="{StaticResource Note}"
+                                   Text="Copies of what you received or pasted. Deleting them keeps the messages, marked as removed; the others keep theirs. Files you sent from your own folders are never touched." />
+                        <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                            <TextBlock VerticalAlignment="Center" FontSize="13" Text="Older than" />
+                            <ComboBox x:Name="AgeCombo" Width="110" Margin="8,0" FontSize="13" Padding="6,4"
+                                      SelectionChanged="OnAgeChanged" />
+                            <Button x:Name="DeleteOldButton" Style="{StaticResource SmallButton}" Content="Delete…" Click="OnDeleteOld" />
+                        </StackPanel>
+                        <CheckBox x:Name="AutoDeleteBox" Margin="0,8,0,0" VerticalContentAlignment="Center" FontSize="13"
+                                  Content="Do this automatically once a day"
+                                  Checked="OnAutoDeleteChanged" Unchecked="OnAutoDeleteChanged" />
+                    </StackPanel>
+                </Border>
+
+                <!-- What else is there -->
+                <Border Style="{StaticResource Card}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Text="Saved GIFs and stickers" />
+                            <TextBlock Style="{StaticResource Note}" Text="Remove them in the GIF panel of any chat (hover one, then ✕)." />
+                        </StackPanel>
+                        <TextBlock x:Name="LibrarySize" Grid.Column="1" Style="{StaticResource SizeText}" />
+
+                        <TextBlock Grid.Row="1" Margin="0,10,0,0" Style="{StaticResource SectionTitle}" Text="Profile pictures" />
+                        <TextBlock x:Name="AvatarsSize" Grid.Row="1" Grid.Column="1" Margin="12,10,0,0" Style="{StaticResource SizeText}" />
+
+                        <TextBlock Grid.Row="2" Margin="0,10,0,0" Style="{StaticResource SectionTitle}" Text="Message history and settings" />
+                        <TextBlock x:Name="HistorySize" Grid.Row="2" Grid.Column="1" Margin="12,10,0,0" Style="{StaticResource SizeText}" />
+
+                        <TextBlock Grid.Row="3" Margin="0,10,0,0" Style="{StaticResource SectionTitle}" Text="Other (in use right now, recent log)" />
+                        <TextBlock x:Name="OtherSize" Grid.Row="3" Grid.Column="1" Margin="12,10,0,0" Style="{StaticResource SizeText}" />
+                    </Grid>
+                </Border>
+
+                <!-- Per chat -->
+                <TextBlock Style="{StaticResource FieldLabel}" Margin="0,20,0,0" Text="By chat" />
+                <TextBlock Style="{StaticResource Note}" Text="Clearing a chat's history removes its messages and their files from this computer only." />
+                <Border Margin="0,8,0,0" BorderThickness="1" CornerRadius="6" BorderBrush="{StaticResource DividerBrush}">
+                    <Grid>
+                        <!-- -1: the last row's divider lies on the box's own border. -->
+                        <ItemsControl x:Name="ChatList" Margin="0,0,0,-1" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type v:ChatStorageRow}">
+                                    <Border x:Name="Row" Padding="14,10" BorderThickness="0,0,0,1" BorderBrush="{StaticResource DividerBrush}">
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                    Style="{StaticResource SmallButton}" Content="Clear history…" Click="OnClearChat" />
+                                            <Button DockPanel.Dock="Right" Margin="12,0,0,0" VerticalAlignment="Center"
+                                                    Style="{StaticResource SmallButton}" Content="Delete files…" Click="OnDeleteChatFiles"
+                                                    IsEnabled="{Binding HasFiles}" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"
+                                                           Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Margin="0,2,0,0" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
+                                                           Text="{Binding Detail}" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="NoChats" Margin="14,12" FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
+                                   Visibility="Collapsed" Text="No messages yet." />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,1,0,0">
+            <DockPanel Margin="24,12,24,16">
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Close" IsCancel="True" IsDefault="True" />
+                <TextBlock VerticalAlignment="Center" FontSize="12">
+                    <Hyperlink Click="OnOpenDataFolder" Foreground="{StaticResource AccentBrush}">Open data folder</Hyperlink>
+                </TextBlock>
+                <TextBlock x:Name="StatusText" Margin="16,0,12,0" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis"
+                           Foreground="{StaticResource AccentBrush}" />
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using MiniLocalChat.Infrastructure;
 using MiniLocalChat.Services;
 using SkiaSharp;
 
@@ -12,10 +13,11 @@ namespace MiniLocalChat.Controls;
 
 /// <summary>
 /// Plays a Telegram animated sticker (.tgs). The frames are drawn once, in the background, at the size
-/// the sticker is shown (sharp at any DPI), and reused by every copy of it. One shared timer moves all
-/// visible stickers, and only while their window is on screen. With <see cref="PlayOnHover"/> it shows
-/// the first frame and plays only under the mouse (panel tiles). Otherwise it plays <see cref="Loops"/>
-/// times when it comes into view, then rests on the first frame (playing costs CPU); hovering replays it.
+/// the sticker is shown (sharp at any DPI), and reused by every copy of it; recently used ones stay
+/// cached up to <see cref="CacheBytes"/>. One shared timer moves all visible stickers, and only while
+/// their window is on screen. With <see cref="PlayOnHover"/> (panel tiles) only the first frame is drawn,
+/// and the rest while the mouse is on it. Otherwise it plays <see cref="Loops"/> times when it comes into
+/// view, then rests on the first frame (playing costs CPU); hovering replays it.
 /// </summary>
 public sealed class StickerPlayer : Image
 {
@@ -30,14 +32,21 @@ public sealed class StickerPlayer : Image
 
     private const double FramesPerSecond = 30;
     private const int MaxFrames = 180;
-    private const int MaxCachedSizes = 40;
 
-    private static readonly Dictionary<(string Path, int Pixels), Task<BitmapSource[]?>> Cache = new();
+    /// <summary>A 160 px sticker at 150 % is about 20 MB of frames, so this keeps a handful.</summary>
+    private const long CacheBytes = 80L * 1024 * 1024;
+
+    private static readonly LruCache<(string Path, int Pixels, bool All), BitmapSource[]> Cache =
+        new(CacheBytes, frames => frames.Length * (long)frames[0].PixelWidth * frames[0].PixelHeight * 4);
+
+    private static readonly Dictionary<(string Path, int Pixels, bool All), Task<BitmapSource[]?>> Rendering = new();
     private static readonly HashSet<StickerPlayer> Playing = [];
     private static readonly Stopwatch Clock = Stopwatch.StartNew();
     private static DispatcherTimer? _timer;
 
     private BitmapSource[]? _frames;
+    private bool _allFrames;
+    private int _loadId;
     private long _startedTicks;
     private int _shownFrame = -1;
     private bool _finished;
@@ -55,9 +64,24 @@ public sealed class StickerPlayer : Image
         MouseEnter += (_, _) =>
         {
             _finished = false;
+            if (PlayOnHover && !_allFrames)
+            {
+                Load(all: true);
+            }
+
             UpdatePlaying();
         };
-        MouseLeave += (_, _) => UpdatePlaying();
+        MouseLeave += (_, _) =>
+        {
+            // A panel tile goes back to its still frame; the others stay in the cache for the next hover.
+            if (PlayOnHover && _allFrames && _frames is { } frames)
+            {
+                _frames = [frames[0]];
+                _allFrames = false;
+            }
+
+            UpdatePlaying();
+        };
     }
 
     public string? Path
@@ -79,26 +103,45 @@ public sealed class StickerPlayer : Image
         set => SetValue(LoopsProperty, value);
     }
 
-    private async void Reload()
+    /// <summary>Forgets all drawn frames (e.g. while the app sits in the tray); stickers on screen keep theirs.</summary>
+    public static void ClearCache() => Cache.Clear();
+
+    private void Reload()
     {
         Stop();
         _frames = null;
+        _allFrames = false;
         _shownFrame = -1;
         _finished = false;
         Source = null;
+        Load(all: !PlayOnHover || IsMouseOver);
+    }
+
+    /// <summary>Gets the frames (all, or just the first) and shows them. A newer load or path change wins.</summary>
+    private async void Load(bool all)
+    {
+        var id = ++_loadId;
         if (!IsLoaded || Path is not { } path || double.IsNaN(Width))
         {
             return;
         }
 
         var pixels = (int)Math.Ceiling(Width * VisualTreeHelper.GetDpi(this).DpiScaleX);
-        var frames = await FramesFor(path, pixels);
-        if (path != Path || frames is not { Length: > 0 })
+        var frames = await FramesFor(path, pixels, all);
+        if (id != _loadId || path != Path || frames is not { Length: > 0 })
         {
-            return; // changed meanwhile, or not a sticker
+            return; // superseded, or not a sticker
+        }
+
+        if (all && PlayOnHover && !IsMouseOver)
+        {
+            frames = [frames[0]]; // the mouse already left
+            all = false;
         }
 
         _frames = frames;
+        _allFrames = all;
+        _shownFrame = -1;
         ShowFrame(0);
         UpdatePlaying();
     }
@@ -178,25 +221,46 @@ public sealed class StickerPlayer : Image
         return timer;
     }
 
-    /// <summary>All frames of a sticker at a pixel size, drawn once in the background and shared.</summary>
-    private static Task<BitmapSource[]?> FramesFor(string path, int pixels)
+    /// <summary>
+    /// The frames of a sticker at a pixel size (all of them, or just the first for a still tile), drawn once
+    /// in the background and shared.
+    /// </summary>
+    private static async Task<BitmapSource[]?> FramesFor(string path, int pixels, bool all)
     {
-        var key = (path, pixels);
-        if (!Cache.TryGetValue(key, out var frames))
+        if (Cache.TryGet((path, pixels, all), out var frames))
         {
-            if (Cache.Count >= MaxCachedSizes)
-            {
-                Cache.Remove(Cache.Keys.First());
-            }
+            return frames;
+        }
 
-            frames = Task.Run(() => Render(path, pixels));
-            Cache[key] = frames;
+        if (!all && Cache.TryGet((path, pixels, true), out var full))
+        {
+            return [full[0]];
+        }
+
+        var key = (path, pixels, all);
+        if (!Rendering.TryGetValue(key, out var rendering))
+        {
+            Rendering[key] = rendering = Task.Run(() => Render(path, pixels, all ? MaxFrames : 1));
+        }
+
+        try
+        {
+            frames = await rendering;
+        }
+        finally
+        {
+            Rendering.Remove(key);
+        }
+
+        if (frames is { Length: > 0 })
+        {
+            Cache.Add(key, frames);
         }
 
         return frames;
     }
 
-    private static BitmapSource[]? Render(string path, int pixels)
+    private static BitmapSource[]? Render(string path, int pixels, int maxFrames)
     {
         try
         {
@@ -206,7 +270,7 @@ public sealed class StickerPlayer : Image
                 return null;
             }
 
-            var count = Math.Clamp((int)Math.Round(animation.Duration.TotalSeconds * FramesPerSecond), 1, MaxFrames);
+            var count = Math.Clamp((int)Math.Round(animation.Duration.TotalSeconds * FramesPerSecond), 1, maxFrames);
             var info = new SKImageInfo(pixels, pixels, SKColorType.Bgra8888, SKAlphaType.Premul);
             using var surface = SKSurface.Create(info);
             var target = new SKRect(0, 0, pixels, pixels);
@@ -236,7 +300,7 @@ public sealed class StickerPlayer : Image
         }
         catch (Exception ex)
         {
-            Infrastructure.Log.Error("Sticker", ex);
+            Log.Error("Sticker", ex);
             return null;
         }
     }

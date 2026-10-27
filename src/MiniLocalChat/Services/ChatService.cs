@@ -166,6 +166,7 @@ public sealed partial class ChatService : ObservableObject
         _maintenanceTimer.Start();
         StartAwayDetection();
         StartUpdates();
+        StartAutoCleanup();
         _presence.Announce(PresenceKinds.Hello, sweepSubnet: true);
     }
 
@@ -173,6 +174,7 @@ public sealed partial class ChatService : ObservableObject
     {
         _maintenanceTimer.Stop();
         StopAwayDetection();
+        StopAutoCleanup();
         _presence?.Announce(PresenceKinds.Bye);
         _presence?.Dispose();
         _server?.Dispose();

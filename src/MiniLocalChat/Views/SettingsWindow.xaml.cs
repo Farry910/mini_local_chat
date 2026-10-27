@@ -12,6 +12,9 @@ namespace MiniLocalChat.Views;
 
 public partial class SettingsWindow : Window
 {
+    /// <summary>Tallest the window gets (less on a small screen); the settings scroll inside it.</summary>
+    private const double MaxWindowHeight = 640;
+
     private readonly ChatService _chat = App.Chat;
     private readonly bool _welcome;
     private string? _avatarId;
@@ -77,11 +80,23 @@ public partial class SettingsWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
-        Loaded += (_, _) => NicknameBox.Focus();
+        Loaded += async (_, _) =>
+        {
+            NicknameBox.Focus();
+            if (!_welcome)
+            {
+                await UpdateStorageSummaryAsync();
+            }
+        };
     }
 
     /// <summary>First run: asks for the nickname. Returns false if the user quit.</summary>
-    public static bool ShowWelcome() => new SettingsWindow(welcome: true).ShowDialog() == true;
+    public static bool ShowWelcome()
+    {
+        var window = new SettingsWindow(welcome: true);
+        WindowSizing.FitHeight(window, null, MaxWindowHeight);
+        return window.ShowDialog() == true;
+    }
 
     public static bool ShowFor(Window? owner)
     {
@@ -96,8 +111,31 @@ public partial class SettingsWindow : Window
             window.Topmost = true;
         }
 
+        WindowSizing.FitHeight(window, window.Owner, MaxWindowHeight);
         return DialogGuard.Run(() => window.ShowDialog()) == true;
     }
+
+    private async Task UpdateStorageSummaryAsync()
+    {
+        try
+        {
+            var report = await _chat.MeasureStorageAsync();
+            StorageSummary.Text = $"Chats and files use {FileSizeConverter.Format(report.Total)} on this computer."
+                + (report.Unused >= 1024 * 1024 ? $" {FileSizeConverter.Format(report.Unused)} of it is unused and can be cleaned up." : "");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StorageSummary.Text = "See what uses space, and clean up old files and chat history.";
+        }
+    }
+
+    private async void OnManageStorage(object sender, RoutedEventArgs e)
+    {
+        StorageWindow.ShowFor(this);
+        await UpdateStorageSummaryAsync();
+    }
+
+    private void OnScrollerMouseWheel(object sender, MouseWheelEventArgs e) => WindowSizing.ScrollOnWheel(sender, e);
 
     private void OnSave(object sender, RoutedEventArgs e)
     {

@@ -9,6 +9,11 @@ A Teams-style private chat for computers on the same local network (e.g. a `192.
 - **Typing indicator:** *Alice is typing…* with bouncing dots above the message box, and *typing…* in the chat list.
 - **Color emoji** everywhere: messages, reactions, the emoji picker and chat previews (the message box itself still shows them in black and white while you type; that's a WPF limit).
 - **Clear chat history** (⋯ in the chat header, or right-click the chat): removes all messages on your computer only.
+- **Storage and history** (Settings → *Manage storage…*): shows what uses disk space and cleans it up.
+  - **Trash:** files no chat shows any more (from deleted messages, cleared or removed chats, old profile pictures, unfinished downloads) are deleted automatically after 30 days unused, or right away with *Empty now*. The error log is trimmed too.
+  - **Pictures and files in chats:** delete the copies older than a week, a month, 3 / 6 months or a year, now or automatically every day. The messages stay, marked *Removed from this computer to save space*.
+  - **By chat:** delete one chat's files, or clear its history together with its files.
+  - Only the app's own copies in the data folder are ever deleted, never files you sent from your own folders, saved GIFs or stickers, or anything still being delivered.
 - **Group chats:** rename, add people, leave (others are told), or delete the chat from your list.
 - **Chat list sections:** Favorites, Online, Offline (☆ a chat to pin it), with search in both the full window and the floating panel.
 - **Offline delivery.** Messages to someone who is offline are queued and sent automatically when they come back online. Your newest message shows **✓ Delivered**, then **✓✓ Seen** once they open the chat (in groups: *Seen by 2 of 3*).

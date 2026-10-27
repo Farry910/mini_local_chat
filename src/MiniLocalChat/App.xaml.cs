@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Windows;
 using System.Windows.Threading;
+using MiniLocalChat.Controls;
 using MiniLocalChat.Infrastructure;
 using MiniLocalChat.Models;
 using MiniLocalChat.Services;
@@ -30,6 +31,7 @@ public partial class App : Application
     private EventWaitHandle? _showSignal;
     private string[] _args = [];
     private DispatcherTimer? _updateTimer;
+    private DispatcherTimer? _trimTimer;
     private bool _installed;
 
     public static ChatService Chat { get; private set; } = null!;
@@ -258,6 +260,7 @@ public partial class App : Application
     {
         _main?.Hide();
         _floating?.Enter();
+        TrimMemorySoon();
 
         if (!Chat.Settings.TrayHintShown)
         {
@@ -266,6 +269,34 @@ public partial class App : Application
             _tray?.ShowBalloon("Mini Local Chat is still running",
                 "The LED at the edge of your screen glows green when messages arrive. Hover it to reply. To quit, right-click this icon and choose Exit.");
         }
+    }
+
+    /// <summary>
+    /// In the tray the app mostly waits, so a few seconds after the window goes away it drops its picture
+    /// and sticker caches and gives the memory it no longer uses back to Windows.
+    /// </summary>
+    private void TrimMemorySoon()
+    {
+        if (_trimTimer is null)
+        {
+            _trimTimer = new DispatcherTimer(DispatcherPriority.ApplicationIdle, Dispatcher) { Interval = TimeSpan.FromSeconds(5) };
+            _trimTimer.Tick += (_, _) =>
+            {
+                _trimTimer.Stop();
+                if (_main is { IsVisible: true } || IsExiting)
+                {
+                    return; // back already
+                }
+
+                PathToImageConverter.ClearCache();
+                StickerPlayer.ClearCache();
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+                Win32.TrimWorkingSet();
+            };
+        }
+
+        _trimTimer.Stop();
+        _trimTimer.Start();
     }
 
     /// <summary>Opens the main window on the Alarms page.</summary>

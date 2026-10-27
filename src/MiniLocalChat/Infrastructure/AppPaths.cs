@@ -16,6 +16,9 @@ public static class AppPaths
     /// <summary>Telegram stickers (.tgs) that were sent, saved or built in, named by content hash; never deleted.</summary>
     public static string StickersDir => Path.Combine(FilesDir, "stickers");
 
+    /// <summary>Screenshots pasted into the message box.</summary>
+    public static string PastedDir => Path.Combine(FilesDir, "pasted");
+
     public static void Initialize(string? customDataDir)
     {
         DataDir = string.IsNullOrWhiteSpace(customDataDir)

@@ -38,7 +38,7 @@
                         <TextBlock Margin="0,3,0,0" HorizontalAlignment="Center" FontSize="10" Text="Alarms" />
                     </StackPanel>
                 </Button>
-                <Button DockPanel.Dock="Bottom" Margin="0,0,0,8" Style="{StaticResource RailButton}" Click="OnSettings">
+                <Button AutomationProperties.Name="Settings" DockPanel.Dock="Bottom" Margin="0,0,0,8" Style="{StaticResource RailButton}" Click="OnSettings">
                     <StackPanel>
                         <TextBlock HorizontalAlignment="Center" FontSize="20" FontFamily="{StaticResource IconFont}" Text="&#xE713;" />
                         <TextBlock Margin="0,3,0,0" HorizontalAlignment="Center" FontSize="10" Text="Settings" />
